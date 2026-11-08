@@ -48,7 +48,11 @@ getter_get() {
 
 if [ "${1:-}" = "--check" ]; then
   if [ "$#" -ne 1 ]; then usage 2; fi
+  # word splitting is intentional to unpack "VERSION RELEASE".
+  # shellcheck disable=SC2046
   set -- $(mk_get "$CORE_MK"); core="$1-r$2"
+  # word splitting is intentional to unpack "VERSION RELEASE".
+  # shellcheck disable=SC2046
   set -- $(mk_get "$UI_MK"); ui="$1-r$2"
   fail=0
   [ "$(getter_get CORE)" = "$core" ] || { echo "CHECK FAIL: get-nadkop.sh CORE=$(getter_get CORE), want $core" >&2; fail=1; }
@@ -73,7 +77,12 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$core_full" ] || usage
 
+# word splitting is intentional to unpack "VERSION RELEASE".
+
+# shellcheck disable=SC2046
 set -- $(split_ver "$core_full"); core_v="$1"; core_r="$2"
+# word splitting is intentional to unpack "VERSION RELEASE".
+# shellcheck disable=SC2046
 set -- $(split_ver "$ui_full"); ui_v="$1"; ui_r="$2"
 
 set_kv() {
@@ -93,10 +102,14 @@ set_kv "$CORE_MK" PKG_RELEASE "$core_r"
 set_kv "$UI_MK" PKG_VERSION "$ui_v"
 set_kv "$UI_MK" PKG_RELEASE "$ui_r"
 if [ -n "$nfqws_full" ]; then
+  # word splitting is intentional to unpack "VERSION RELEASE".
+  # shellcheck disable=SC2046
   set -- $(split_ver "$nfqws_full")
   set_kv "$NFQWS_MK" PKG_VERSION "$1"
   set_kv "$NFQWS_MK" PKG_RELEASE "$2"
 fi
+# word splitting is intentional to unpack "VERSION RELEASE".
+# shellcheck disable=SC2046
 set -- $(mk_get "$NFQWS_MK"); nfqws="$1-r$2"
 
 # LuCI cache-buster tracks the UI package version.

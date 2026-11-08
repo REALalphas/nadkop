@@ -9,7 +9,7 @@ umask 077
 work="$(mktemp -d /tmp/nadkop-tuner-test.XXXXXX)"
 router=nktune-router
 server=nktune-server
-engine= fixture= job=
+engine='' fixture='' job=''
 passes=0
 runtime=/var/run/nadkop/zapret-tune
 if [ -f "$runtime/active" ]; then

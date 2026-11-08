@@ -5,7 +5,7 @@ umask 077
 binary="${1:-/usr/bin/nadkop}"
 work="$(mktemp -d /tmp/nadkop-selection.XXXXXX)"
 cp /etc/hosts "$work/hosts"
-a_pid= b_pid= xray_pid= monitor_pid= http_pid=
+a_pid='' b_pid='' xray_pid='' monitor_pid='' http_pid=''
 cleanup() {
  for pid in "$monitor_pid" "$xray_pid" "$a_pid" "$b_pid" "$http_pid"; do [ -z "$pid" ] || kill "$pid" 2>/dev/null || true; done
  cp "$work/hosts" /etc/hosts

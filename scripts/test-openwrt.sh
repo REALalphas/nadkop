@@ -26,8 +26,15 @@ wait_ready() {
   if [ -n "$pid" ] && [ -r "/proc/$pid/cmdline" ]; then
    actual="$(tr '\000' '\n' < "/proc/$pid/cmdline" | sed -n '4p')"
   fi
-  if [ -n "$pid" ] && [ -n "$inode" ] && [ -n "$actual" ] && [ "$(readlink -f "$actual")" = "$expected" ] && [ "$(readlink -f "$configured")" = "$expected" ] && ls -l "/proc/$pid/fd" 2>/dev/null | grep -q "socket:\[$inode\]"; then
-   if [ ! -s /var/run/nadkop/current/zapret-hosts.txt ] || grep -q '^ *200 ' /proc/net/netfilter/nfnetlink_queue; then return 0; fi
+  if [ -n "$pid" ] && [ -n "$inode" ] && [ -n "$actual" ] && [ "$(readlink -f "$actual")" = "$expected" ] && [ "$(readlink -f "$configured")" = "$expected" ]; then
+   socket_found=0
+   for fd in "/proc/$pid/fd"/*; do
+    [ -L "$fd" ] || continue
+    case "$(readlink "$fd" 2>/dev/null)" in "socket:[$inode]") socket_found=1; break ;; esac
+   done
+   if [ "$socket_found" = 1 ]; then
+    if [ ! -s /var/run/nadkop/current/zapret-hosts.txt ] || grep -q '^ *200 ' /proc/net/netfilter/nfnetlink_queue; then return 0; fi
+   fi
   fi
   n=$((n+1)); [ "$n" -lt 10 ] || { echo 'FAIL: intended Xray generation did not own the SOCKS listener'; return 1; }; sleep 1
  done

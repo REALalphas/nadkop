@@ -7,7 +7,7 @@ umask 077
 work="$(mktemp -d /tmp/nadkop-lan-test.XXXXXX)" || exit 2
 client=nkt-client
 server=nkt-server
-http_pid= proxy_http_pid= v6_http_pid= upstream_pid= udp_pid= dns_pid= occupied_pid=
+http_pid='' proxy_http_pid='' v6_http_pid='' upstream_pid='' udp_pid='' dns_pid='' occupied_pid=''
 was_running=0
 /etc/init.d/nadkop running >/dev/null 2>&1 && was_running=1
 for file in config.json nodes.json servers.json; do cp "/etc/nadkop/$file" "$work/$file" || exit 2; done

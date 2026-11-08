@@ -24,7 +24,7 @@ backup=$work/private
 mkdir -m 700 "$backup"
 changed=0
 backup_ready=0
-http_a= http_b= proxy_a= proxy_b=
+http_a='' http_b='' proxy_a='' proxy_b=''
 original_running=0
 original_enabled=0
 original_gen=
