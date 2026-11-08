@@ -1,0 +1,14 @@
+{
+  "sources": [
+    {"name": "local", "file": "/etc/nadkop/nodes.json"}
+  ],
+  "default": "direct",
+  "socksPort": 1080,
+  "wanInterface": "eth1",
+  "rules": [
+    {"domains": ["proxy.example"], "action": "proxy", "node": "local/example"},
+    {"domains": ["dpi.example"], "action": "zapret"},
+    {"domains": ["blocked.example"], "action": "block"}
+  ],
+  "zapretArgs": ["--filter-tcp=80,443", "--dpi-desync=fake", "--dpi-desync-ttl=2"]
+}

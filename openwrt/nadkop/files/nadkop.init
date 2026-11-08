@@ -1,0 +1,136 @@
+#!/bin/sh /etc/rc.common
+
+USE_PROCD=1
+START=95
+STOP=10
+
+# Package hooks call start even when an existing generation is running.
+# Prepare outside procd registration so preflight failure cannot clear it.
+if [ "${action:-}" = start ] && [ -z "$NADKOP_PREPARED" ]; then
+ exec /usr/bin/nadkop apply
+fi
+
+# Validate and prepare before replacing any running procd instance.
+restart() {
+	/usr/bin/nadkop apply
+}
+
+reload_service() {
+	/usr/bin/nadkop apply
+}
+
+start_service() {
+	umask 077
+	NADKOP_START_FAILED=1
+	local root=/var/run/nadkop generation previous arg key keys json_namespace
+	mkdir -p "$root" && chmod 711 "$root" || return 1
+	if [ -n "$NADKOP_PREPARED" ]; then
+		case "$NADKOP_PREPARED" in "$root"/generation.*) generation="$NADKOP_PREPARED" ;; *) return 1 ;; esac
+		[ -d "$generation" ] && [ ! -L "$generation" ] || return 1
+	else
+		generation="$(mktemp -d "$root/generation.XXXXXX")" || return 1
+		rmdir "$generation" || return 1
+		/usr/bin/nadkop generate -output "$generation" || return 1
+	fi
+	if ! /usr/bin/xray run -test -config "$generation/xray.json" >/dev/null 2>&1 ||
+	   ! /usr/bin/nadkop network check -generation "$generation"; then
+		logger -t nadkop 'Preflight failed; generated configuration rejected'
+		rm -rf "$generation"
+		return 1
+	fi
+	if [ -s "$generation/zapret-hosts.txt" ] || [ -s "$generation/zapret-ips.txt" ]; then
+		if ! /usr/sbin/nfqws --version >/dev/null 2>&1; then rm -rf "$generation"; return 1; fi
+		# 2147483647 (INT_MAX, not nobody) matches nfqws --uid= in compile.go:
+		# a fixed unprivileged identity for the DPI-bypass worker.
+		chown 2147483647:2147483647 "$generation/zapret-hosts.txt" "$generation/zapret-ips.txt" || return 1
+		chmod 711 "$generation" || return 1
+	fi
+	if [ -s "$generation/icmp-dgram" ]; then
+		set -- $(cat /proc/sys/net/ipv4/ping_group_range)
+		[ "$#" -eq 2 ] || return 1
+		if [ "$1" != 0 ]; then printf '0 %s\n' "$2" > /proc/sys/net/ipv4/ping_group_range || return 1; fi
+	fi
+	previous="$(readlink "$root/current")"
+	if ! /usr/bin/nadkop network apply -generation "$generation"; then
+		[ -e "$root/network-transaction.json" ] || rm -rf "$generation"
+		return 1
+	fi
+	rm -f "$root/current.next"
+	if ! ln -s "$generation" "$root/current.next" || ! mv -Tf "$root/current.next" "$root/current"; then
+		/usr/bin/nadkop network rollback -generation "$generation" || return 1
+		rm -f "$root/current.next"
+		rm -rf "$generation"
+		return 1
+	fi
+	# current is the commit point. Failed journal cleanup must not leave the
+	# published firewall without its processes; recovery can retry the cleanup.
+	if ! /usr/bin/nadkop network commit -generation "$generation"; then
+		[ "$(readlink "$root/current")" = "$generation" ] || return 1
+		logger -t nadkop 'Network journal cleanup failed; published generation retained for recovery' || :
+	fi
+
+	procd_open_instance xray
+	procd_set_param command /usr/bin/xray run -config "$generation/xray.json"
+	procd_set_param respawn 3600 5 5
+	procd_set_param stdout 0
+	procd_set_param stderr 1
+	procd_close_instance
+
+	if [ -s "$generation/health.json" ]; then
+		procd_open_instance monitor
+		procd_set_param command /usr/bin/nadkop monitor -manifest "$generation/health.json"
+		procd_set_param respawn 3600 5 5
+		procd_set_param stdout 0
+		procd_set_param stderr 1
+		procd_close_instance
+	fi
+	if [ "$(jsonfilter -i "$generation/runtime.json" -e '@.updateIntervalHours')" -gt 0 ]; then
+		procd_open_instance updater
+		procd_set_param command /usr/bin/nadkop updater
+		procd_set_param respawn 3600 5 5
+		procd_set_param stdout 0
+		procd_set_param stderr 1
+		procd_close_instance
+	fi
+	if [ -s "$generation/zapret-hosts.txt" ] || [ -s "$generation/zapret-ips.txt" ]; then
+		json_set_namespace nadkop_args json_namespace
+		json_load "{\"args\":$(cat "$generation/nfqws-args.json")}"
+		json_select args
+		json_get_keys keys
+		procd_open_instance nfqws
+		procd_set_param command /usr/sbin/nfqws
+		for key in $keys; do
+			json_get_var arg "$key"
+			# Generation-specific paths make procd reload nfqws's in-memory
+			# hostlist even when the strategy itself has not changed.
+			case "$arg" in
+				--hostlist=/var/run/nadkop/current/zapret-hosts.txt) arg="--hostlist=$generation/zapret-hosts.txt" ;;
+				--ipset=/var/run/nadkop/current/zapret-ips.txt) arg="--ipset=$generation/zapret-ips.txt" ;;
+			esac
+			procd_append_param command "$arg"
+		done
+		procd_set_param respawn 3600 5 5
+		procd_set_param stdout 0
+		procd_set_param stderr 1
+		procd_close_instance
+		json_cleanup
+		json_set_namespace "$json_namespace"
+	fi
+	local path
+	for path in "$root"/generation.*; do
+		[ "$path" = "$generation" ] || [ "$path" = "$previous" ] || rm -rf "$path"
+	done
+	NADKOP_START_FAILED=0
+}
+
+service_started() {
+	[ "$NADKOP_START_FAILED" = 0 ]
+}
+
+stop_service() {
+	/usr/bin/nadkop network stop
+}
+
+service_triggers() {
+	procd_add_reload_trigger nadkop network
+}

@@ -1,0 +1,8 @@
+{
+  "admin/services/nadkop": {
+    "title": "Nadkop",
+    "order": 60,
+    "action": { "type": "view", "path": "nadkop/overview" },
+    "depends": { "acl": [ "luci-app-nadkop" ] }
+  }
+}

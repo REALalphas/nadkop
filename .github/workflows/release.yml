@@ -1,0 +1,186 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version like 0.4.0-r1 (Makefiles must already be bumped)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  REPO: REALalphas/nadkop
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      ver: ${{ steps.v.outputs.ver }}
+      base_url: ${{ steps.v.outputs.base_url }}
+    steps:
+      - id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RAW="${{ inputs.version }}"
+          else
+            RAW="${GITHUB_REF_NAME}"
+          fi
+          VER="${RAW#v}"
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          echo "base_url=https://github.com/${{ env.REPO }}/releases/download/v${VER}" >> "$GITHUB_OUTPUT"
+
+  build-go:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version.outputs.ver }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - run: bash scripts/bump-version.sh --check
+      - run: |
+          mkdir -p dist/host
+          GOOS=linux GOARCH=amd64 go build -o dist/host/nadkop-linux-x86_64 ./cmd/nadkop
+          GOOS=linux GOARCH=arm64 go build -o dist/host/nadkop-linux-aarch64 ./cmd/nadkop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: host-${{ needs.version.outputs.ver }}
+          path: dist/host/
+
+  build-openwrt:
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # NOTE: refresh point-release + SDK filenames when OpenWrt ships updates.
+          - combo: apk-x86_64
+            pkgtype: apk
+            arch: x86_64
+            sdk_url: https://downloads.openwrt.org/releases/25.12.0/targets/x86/64/openwrt-sdk-25.12.0-x86-64_gcc-14.2.0_musl.Linux-x86_64.tar.zst
+          - combo: apk-aarch64
+            pkgtype: apk
+            arch: aarch64
+            sdk_url: https://downloads.openwrt.org/releases/25.12.0/targets/aarch64/generic/openwrt-sdk-25.12.0-aarch64_generic-gcc-14.2.0_musl.Linux-x86_64.tar.zst
+          - combo: ipk-x86_64
+            pkgtype: ipk
+            arch: x86_64
+            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/x86/64/openwrt-sdk-24.10.2-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+          - combo: ipk-aarch64
+            pkgtype: ipk
+            arch: aarch64
+            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/aarch64/generic/openwrt-sdk-24.10.2-aarch64_generic-gcc-13.3.0_musl.Linux-x86_64.tar.zst
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version.outputs.ver }}
+      - run: bash scripts/bump-version.sh --check
+      - name: OpenWrt SDK prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential clang flex bison gawk gettext \
+            libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
+            file wget curl zstd git
+      - name: Fetch SDK
+        run: |
+          mkdir -p /tmp/sdk
+          curl -fSL "${{ matrix.sdk_url }}" -o /tmp/sdk.tar.zst
+          tar --zstd -xf /tmp/sdk.tar.zst -C /tmp/sdk --strip-components=1
+      - name: Prepare feeds (pinned upstream + golang)
+        working-directory: /tmp/sdk
+        run: |
+          ./scripts/feeds update packages luci
+          ./scripts/feeds install -p packages golang
+      - name: Build nadkop packages
+        run: bash "$GITHUB_WORKSPACE/scripts/build-openwrt.sh" /tmp/sdk "$GITHUB_WORKSPACE/dist/${{ matrix.combo }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: owrt-${{ matrix.combo }}-${{ needs.version.outputs.ver }}
+          path: dist/${{ matrix.combo }}/
+
+  publish:
+    needs: [version, build-go, build-openwrt]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version.outputs.ver }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - name: Assemble release layout
+        env:
+          VER: ${{ needs.version.outputs.ver }}
+          BASE_URL: ${{ needs.version.outputs.base_url }}
+        run: |
+          set -eu
+          mkdir -p release/
+          cp artifacts/host-*/nadkop-linux-* release/
+          # Collect packages; disambiguate APK names per arch (upstream names collide).
+          for combo in apk-x86_64 apk-aarch64 ipk-x86_64 ipk-aarch64; do
+            arch="${combo##*-}"
+            for p in artifacts/owrt-"$combo"-*/nadkop*.apk artifacts/owrt-"$combo"-*/*.ipk; do
+              [ -e "$p" ] || continue
+              case "$p" in
+                *.apk) cp "$p" "release/$(basename "$p" .apk)-${arch}.apk" ;;
+                *) cp "$p" release/ ;;
+              esac
+            done
+          done
+          cp scripts/install-openwrt.sh release/
+          python3 - "$VER" "$BASE_URL" <<'PY'
+          import re, sys
+          ver, base = sys.argv[1], sys.argv[2]
+          core = ui = ver
+          m = re.search(r'^PKG_VERSION:=(\S+)\s*$', open('openwrt/nadkop/Makefile').read(), re.M)
+          if m: core = m.group(1) + '-r' + re.search(r'^PKG_RELEASE:=(\S+)\s*$', open('openwrt/nadkop/Makefile').read(), re.M).group(1)
+          m = re.search(r'^PKG_VERSION:=(\S+)\s*$', open('openwrt/luci-app-nadkop/Makefile').read(), re.M)
+          if m: ui = m.group(1) + '-r' + re.search(r'^PKG_RELEASE:=(\S+)\s*$', open('openwrt/luci-app-nadkop/Makefile').read(), re.M).group(1)
+          nfqws_m = re.search(r'^PKG_VERSION:=(\S+)\s*$', open('openwrt/nadkop-nfqws/Makefile').read(), re.M)
+          nfqws = (nfqws_m.group(1) + '-r' + re.search(r'^PKG_RELEASE:=(\S+)\s*$', open('openwrt/nadkop-nfqws/Makefile').read(), re.M).group(1)) if nfqws_m else 'unknown'
+          src = open('scripts/get-nadkop.sh').read()
+          src = re.sub(r'^CORE="\$\{NADKOP_CORE:-[^}]*\}"', f'CORE="${{NADKOP_CORE:-{core}}}"', src, flags=re.M)
+          src = re.sub(r'^UI="\$\{NADKOP_UI:-[^}]*\}"', f'UI="${{NADKOP_UI:-{ui}}}"', src, flags=re.M)
+          src = re.sub(r'^NFQWS="\$\{NADKOP_NFQWS:-[^}]*\}"', f'NFQWS="${{NADKOP_NFQWS:-{nfqws}}}"', src, flags=re.M)
+          # Default BASE_URL becomes this release, so `sh get-nadkop.sh` works with no args.
+          src = re.sub(r'^BASE_URL="\$\{1:-\}"', f'BASE_URL="${{1:-{base}}}"', src, flags=re.M)
+          open('release/get-nadkop.sh', 'w').write(src)
+          PY
+          chmod +x release/get-nadkop.sh
+          ( cd release && sha256sum -- * > sha256sums )
+          ls -la release/
+      - name: Release notes from CHANGELOG.md
+        env:
+          VER: ${{ needs.version.outputs.ver }}
+        run: |
+          python3 - "$VER" > release/notes.md <<'PY'
+          import re, sys
+          ver = sys.argv[1]
+          text = open('CHANGELOG.md', encoding='utf-8').read()
+          lines = text.splitlines()
+          start = next((i for i, l in enumerate(lines) if ver in l), None)
+          if start is None:
+              print(f'Nadkop {ver}. See CHANGELOG.md for details.')
+          else:
+              end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith('## ')), len(lines))
+              print('\n'.join(lines[start:end]).strip())
+          PY
+          printf '\n\n---\nFull history: CHANGELOG.md. One-line install from this release:\n```sh\nuclient-fetch -O /tmp/get-nadkop.sh %s/get-nadkop.sh && sh /tmp/get-nadkop.sh %s\n```\n' \
+            "${{ needs.version.outputs.base_url }}" "${{ needs.version.outputs.base_url }}" >> release/notes.md
+          cat release/notes.md
+      - name: Create GitHub Release
+        env:
+          VER: ${{ needs.version.outputs.ver }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v$VER" --title "v$VER" --notes-file release/notes.md \
+            release/nadkop-linux-x86_64 release/nadkop-linux-aarch64 \
+            release/*.apk release/*.ipk release/sha256sums \
+            release/get-nadkop.sh release/install-openwrt.sh

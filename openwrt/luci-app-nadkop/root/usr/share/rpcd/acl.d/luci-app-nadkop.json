@@ -1,0 +1,48 @@
+{
+  "luci-app-nadkop": {
+    "description": "Configure Nadkop subscriptions, nodes, routing and services",
+    "read": {
+      "ubus": {
+        "nadkop": [
+          "status"
+        ],
+        "luci-rpc": [
+          "getBoardJSON",
+          "getHostHints",
+          "getNetworkDevices",
+          "getWirelessDevices"
+        ],
+        "network": [
+          "get_proto_handlers"
+        ],
+        "network.interface": [
+          "dump"
+        ]
+      },
+      "uci": [
+        "luci",
+        "network",
+        "wireless"
+      ]
+    },
+    "write": {
+      "ubus": {
+        "nadkop": [
+          "get",
+          "validate",
+          "save",
+          "import",
+          "addsource",
+          "nodes",
+          "check",
+          "service",
+          "identity",
+          "probe",
+          "zaprettune",
+          "geodata",
+          "updategeo"
+        ]
+      }
+    }
+  }
+}

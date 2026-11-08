@@ -1,0 +1,166 @@
+/* Layout and interaction only. LuCI supplies colours, controls and typography. */
+.nk-app .nk-tuner{min-width:0;margin-top:1em}
+.nk-app .nk-tuner .nk-toolbar button{white-space:normal;max-width:100%;height:auto;min-height:2.5em}
+.nk-app .nk-tune-results{padding-inline-start:1.25em;max-height:24em;overflow:auto}
+.nk-app .nk-tune-results li{display:grid;gap:.15em;margin-block:.65em;overflow-wrap:anywhere}
+.nk-app .nk-tune-args{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+.nk-app .nk-tuner progress{width:min(100%,28em)}
+.nk-app [hidden]{display:none!important}
+.nk-app .nk-heading,.nk-app .nk-toolbar,.nk-app .nk-rule-head,.nk-app .nk-rule-actions,.nk-app .nk-picker-header,.nk-app .nk-picker-filters{display:flex;align-items:center;flex-wrap:wrap;gap:.5em}
+.nk-app .nk-heading{justify-content:space-between}
+.nk-app .nk-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,360px);gap:1em;align-items:start}
+.nk-app .nk-rule-list{display:grid;gap:1em;min-width:0}
+.nk-app .nk-rule,.nk-app .nk-picker,.nk-app .nk-source-section,.nk-app .nk-source-entry{min-width:0;margin:0}
+.nk-app .nk-source-section,.nk-app .nk-source-entry{margin-bottom:1em}
+.nk-app .nk-rule-head{flex-wrap:nowrap;justify-content:space-between}
+.nk-app .nk-rule-heading{display:flex;align-items:center;gap:.35em;flex:1;min-width:0}
+.nk-app .nk-rule-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nk-app .nk-rule-heading>button,.nk-app .nk-rule-header-actions>button{flex:none;margin:0}
+.nk-app .nk-rule-header-actions{display:flex;align-items:center;gap:.35em;flex:none}
+.nk-app .nk-rule-header-actions>button{width:1.9em!important}
+.nk-app .nk-rule-body{min-width:0;margin-top:.5em}
+.nk-app .nk-rule-head h3,.nk-app .nk-picker-header h3{margin:0}
+.nk-app .nk-rule.is-over{outline:2px solid currentColor;outline-offset:2px}
+.nk-app .nk-picker-header{margin-bottom:.75em}
+.nk-app .nk-picker-title{display:flex;align-items:center;gap:.4em;flex:1 0 auto;min-width:0}
+.nk-app .nk-picker-title .nk-help{margin:0}
+.nk-app .nk-picker-caption{white-space:nowrap}
+.nk-app .nk-picker-target{display:block;margin-bottom:.5em}
+.nk-app .nk-picker-filters{flex-wrap:nowrap;margin-bottom:.75em}
+.nk-app .nk-picker-filters select{flex:1;width:0;min-width:0;max-width:100%}
+.nk-app .nk-picker-list{display:grid;gap:.35em;max-height:65vh;overflow:auto;min-width:0}
+.nk-app .nk-server-card{display:flex;align-items:stretch;gap:.25em;min-width:0}
+.nk-app .nk-server-main{display:flex;align-items:center;gap:0;padding-inline-start:0;flex:1;min-width:0;max-width:100%;margin:0;text-align:start;white-space:normal;text-transform:none}
+.nk-app .nk-server-card[draggable=true]{cursor:grab}
+.nk-app .nk-server-card.is-dragging{opacity:.5}
+.nk-app .nk-server-copy{flex:1;min-width:0}
+.nk-app .nk-server-title-row{display:flex;align-items:center;gap:.3em;min-width:0}
+.nk-app .nk-server-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nk-app .nk-server-meta{display:flex;align-items:center;gap:.5em;min-width:0;white-space:nowrap;overflow:hidden}
+.nk-app .nk-protocol,.nk-app .nk-transport{flex:none}
+.nk-app .nk-source{margin-inline-start:auto;text-align:end;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nk-app .nk-card-controls{display:flex;align-items:center;gap:.2em;flex:none}
+.nk-app .nk-picker .nk-card-controls{flex-direction:column;align-items:center;justify-content:space-between;align-self:stretch;padding-block:0 .4em;box-sizing:border-box}
+.nk-app .nk-pin,.nk-app .nk-unlink{margin:0;min-width:0;padding:.35em;line-height:1}
+.nk-app .nk-grip{display:inline-flex;align-items:center;justify-content:center;width:1.9em;height:1.2em;cursor:grab}
+.nk-app .nk-icon{display:inline-block;flex:none;width:16px;height:16px;vertical-align:middle;pointer-events:none}
+.nk-app .nk-action{display:inline-flex;align-items:center;justify-content:center;gap:.3em}
+.nk-app .nk-help{display:inline-block;cursor:help;margin-inline-start:.4em}
+.nk-app .nk-rule-actions{position:relative}
+.nk-app .nk-zapret-action{display:inline-flex;align-items:center;gap:.3em}
+.nk-app .nk-action-help{display:inline-block;margin:0}
+.nk-app .nk-action-help>summary{cursor:help;padding:.3em}
+.nk-app .nk-action-help>p{position:absolute;z-index:10;inset-inline-start:0;top:100%;width:max-content;max-width:min(24em,100%);box-sizing:border-box;margin:0;padding:.6em;border:1px solid currentColor;background:var(--background-color,Canvas);color:var(--text-color,CanvasText);white-space:normal;overflow-wrap:anywhere}
+.nk-app .nk-rule-name{flex:1;min-width:0;width:0;max-width:100%;box-sizing:border-box}
+.nk-app .nk-diagnostic-steps li{margin-block:.5em}
+.nk-app .nk-diagnostic-steps{overflow-wrap:anywhere}
+.nk-app .nk-provider-separator{display:flex;align-items:center;gap:.5em;padding:.75em 0 .25em;min-width:0;overflow-wrap:anywhere}
+.nk-app .nk-provider-separator::before,.nk-app .nk-provider-separator::after{content:"";flex:1;min-width:.5em;border-top:1px solid currentColor}
+.nk-app .nk-provider-separator>span{min-width:0;max-width:88%;text-align:center}
+.nk-app .nk-search-field{min-width:0;margin-bottom:.5em}
+.nk-app .nk-search-field input.nk-picker-search,.nk-app .nk-source-input,.nk-app textarea{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.nk-app summary.nk-source-heading{overflow-wrap:anywhere;cursor:pointer}
+.nk-app .nk-source-heading strong{margin-inline-end:.5em}
+.nk-app .nk-source-section details,.nk-app .nk-source-entry details{margin-top:.5em}
+.nk-app .nk-source-message{overflow-wrap:anywhere}
+.nk-app .nk-source-message:empty{display:none}
+.nk-app .nk-identity{overflow-wrap:anywhere;user-select:all}
+.nk-app .nk-flag{position:relative;margin-inline:.75em;flex:0 0 32px;width:32px;height:24px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.nk-app .nk-flag img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.nk-app .nk-flag-fallback{display:flex;align-items:center;justify-content:center}
+.nk-app .nk-emoji{display:inline-block;position:relative;width:1.15em;height:1.15em;line-height:1.15;vertical-align:-.15em}
+.nk-app .nk-emoji img{position:absolute;inset:0;object-fit:contain;width:100%;height:100%;pointer-events:none}
+.nk-app .nk-emoji-fallback{display:inline-block;line-height:1.15}
+@media(max-width:1100px){.nk-app .nk-workspace{grid-template-columns:1fr}.nk-app .nk-picker{grid-row:1}.nk-app .nk-picker-list{max-height:26em}}
+@media(max-width:600px){.nk-app .cbi-value-title{float:none;display:block;width:auto;text-align:start}.nk-app .cbi-value-field{margin-left:0;width:auto;min-width:0}}
+
+.nk-app .nk-rule-server-list{display:flex;align-items:flex-start;gap:.5em;padding-inline-start:2em;min-width:0}
+.nk-app .nk-rule-servers{flex:1;list-style:none;margin:.5em 0;padding:0;min-width:0}
+.nk-app .nk-rule-servers>li{display:grid;grid-template-columns:3.5em minmax(0,1fr);margin-block:.5em;min-width:0}
+.nk-app .nk-server-position{grid-row:1;grid-column:1;align-self:center;text-align:center;font-variant-numeric:tabular-nums}
+.nk-app .nk-rule-servers>li>.nk-server-card{grid-column:2;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:minmax(1.9em,auto) minmax(1.9em,auto);gap:0 .5em;align-items:center}
+.nk-app .nk-rule-servers .nk-server-main{grid-column:1;grid-row:1 / span 2;padding-block:.4em;box-sizing:border-box}
+.nk-app .nk-server-copy{display:flex;flex-direction:column;justify-content:center;gap:.15em;line-height:1.35}
+.nk-app .nk-server-title-row,.nk-app .nk-server-meta{margin:0;padding:0;line-height:1.35}
+.nk-app .nk-picker .nk-server-main{min-height:3.8em;box-sizing:border-box;padding-block:.4em}
+.nk-app .nk-assigned-top{grid-column:2;grid-row:1;display:flex;align-items:center;justify-content:flex-end;gap:.5em;min-width:0}
+.nk-app .nk-assigned-top .nk-card-controls{margin:0}
+.nk-app .nk-assigned-footer{grid-column:2;grid-row:2}
+.nk-app .nk-rule-servers>li>.nk-assigned-footer{grid-column:2}
+.nk-app .nk-order-controls{display:flex;gap:.3em;justify-content:flex-end;margin-top:.25em}
+
+@media(max-width:700px){.nk-app .nk-rule-head{flex-wrap:nowrap}}
+
+
+.nk-app .nk-rule-toggle,.nk-app .nk-rule-header-actions>button,.nk-app .nk-pin,.nk-app .nk-unlink,.nk-app .nk-order-controls>button,.nk-app .nk-move-server{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:1.9em;min-width:0;max-width:1.9em;height:1.9em;min-height:0;padding:0;flex:none}
+.nk-app .nk-server-toolbar-single{display:flex;justify-content:flex-end;margin-block:.5em}
+.nk-app .nk-server-toolbar .cbi-value-field{display:flex;align-items:center;gap:1em;min-width:0}
+.nk-app .nk-server-toolbar select{flex:1;min-width:0;max-width:100%;box-sizing:border-box}
+.nk-app .nk-server-toolbar button{flex:none;margin:0;white-space:nowrap}
+.nk-app .nk-rule-body input[type=url]{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+
+.nk-app .nk-assigned-footer{display:flex;align-items:center;gap:.5em;min-height:1.9em;padding-inline-start:0}
+.nk-app .nk-assigned-footer .nk-order-controls{margin:0;flex:none}
+.nk-app .nk-assigned-footer .nk-source{flex:1}
+.nk-app .nk-probe-result{display:inline-flex;align-items:center;gap:.3em;white-space:nowrap;flex:none;margin-inline-start:auto}
+.nk-app .nk-probe-result[data-state=ok]{color:var(--success-color-high,var(--success-color,var(--green-color,#2eaf67)))}
+.nk-app .nk-probe-result[data-state=error]{color:var(--error-color-high,var(--error-color,var(--red-color,#e05252)))}
+.nk-app .nk-probe-result[data-state=pending] .nk-icon{animation:nk-spin 1s linear infinite}
+@keyframes nk-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.nk-app .nk-probe-result[data-state=pending] .nk-icon{animation:none}}
+.nk-app .nk-source-rename{width:1.9em;min-width:0;height:1.9em;padding:0;margin-inline-start:.5em}
+
+.nk-app .nk-set-choices{display:flex;align-items:center;flex-wrap:wrap;gap:.4em;min-width:0}
+.nk-geo-picker{min-width:0}
+.nk-geo-filters{display:flex;gap:.5em;flex-wrap:wrap;margin-bottom:.5em}
+.nk-geo-filters input{flex:1;min-width:0;max-width:100%;box-sizing:border-box}
+.nk-geo-results{display:grid;gap:.3em;max-height:55vh;overflow:auto;margin-top:.5em}
+.nk-geo-result{display:flex;align-items:center;justify-content:space-between;gap:1em;width:100%;text-align:start;white-space:normal;overflow-wrap:anywhere}
+.nk-geo-result>small{flex:none}
+.nk-geo-result>span{min-width:0}
+.nk-app .nk-geo-settings input[type=url]{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+
+.nk-app .nk-rule-server-list>.nk-server-list-toggle{flex:none;box-sizing:border-box;width:1.9em;min-width:0;max-width:1.9em;height:1.9em;min-height:0;padding:0;margin:1em 0 0}
+.nk-app .nk-rule-servers[data-collapsed=true] .nk-move-server{display:none}
+
+html:has(.nk-app){scrollbar-gutter:stable}
+.nk-app .nk-server-buttons{display:flex;align-items:stretch;gap:.5em;flex:none}
+.nk-app .nk-server-refresh{box-sizing:border-box;min-width:0;padding-inline:.6em;align-self:stretch;gap:0}
+.nk-app .nk-server-refresh::after{content:"";height:1lh;width:0}
+.nk-app .nk-pool-refresh{align-self:center}
+.nk-app .nk-server-refresh[aria-busy=true] .nk-icon{animation:nk-spin 1s linear infinite}
+@media(prefers-reduced-motion:reduce){.nk-app .nk-server-refresh[aria-busy=true] .nk-icon{animation:none}}
+
+.nk-app .nk-runtime-checks{list-style:none;margin:.5em 0 1em;padding:0;max-width:36em}
+.nk-app .nk-runtime-checks>li{margin:.5em 0}
+.nk-app .nk-runtime-line{display:flex;align-items:center;justify-content:space-between;gap:1em}
+.nk-app .nk-runtime-line>span{display:inline-flex;align-items:center;gap:.4em;white-space:nowrap}
+.nk-app .nk-runtime-checks [data-state=error] .nk-runtime-line>span{color:var(--error-color-high,var(--error-color,#e05252))}
+.nk-app .nk-probe-result{max-width:12em;min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+/* Share the exact status/footer tracks with the name/protocol tracks. */
+.nk-app .nk-rule-servers .nk-server-main{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:subgrid;align-self:stretch;align-items:center;padding-block:0}
+.nk-app .nk-rule-servers .nk-server-main>.nk-flag{grid-row:1 / span 2}
+.nk-app .nk-rule-servers .nk-server-copy{display:grid;grid-column:2;grid-row:1 / span 2;grid-template-columns:minmax(0,1fr);grid-template-rows:subgrid;justify-content:stretch;align-self:stretch;align-items:center;gap:0}
+.nk-app .nk-rule-servers .nk-server-title-row{grid-row:1}
+.nk-app .nk-rule-servers .nk-server-meta{grid-row:2}
+
+.nk-app .nk-rule-error{margin:.4em 0 0;color:var(--error-color-high,var(--error-color,#e05252));font:inherit;overflow-wrap:anywhere}
+.nk-app .nk-field-invalid textarea,.nk-app .nk-field-invalid input,.nk-app .nk-field-invalid select{border-color:var(--error-color-high,var(--error-color,#e05252))}
+.nk-app .nk-field-invalid .nk-set-choices{outline:1px solid var(--error-color-high,var(--error-color,#e05252));outline-offset:3px}
+
+.nk-app .nk-matcher-switches{display:flex;align-items:center;flex-wrap:wrap;gap:.5em}
+.nk-app .nk-matcher-switch{display:inline-flex;align-items:center;gap:.4em;margin:0;white-space:nowrap;cursor:pointer}
+.nk-app .nk-field-invalid .nk-matcher-switches{outline:1px solid var(--error-color-high,var(--error-color,#e05252));outline-offset:4px}
+
+.nk-app>.cbi-page-actions{margin-block-start:1.5em}
+.nk-app .nk-settings-section{margin-block:0 1.5em;min-width:0}
+.nk-app .nk-settings-section .cbi-value-description{margin-block:.35em 0;max-width:48em}
+.nk-app .nk-settings-section .cbi-dropdown{max-width:100%;box-sizing:border-box}
+
+@media(hover:hover) and (pointer:fine){
+ .nk-app .nk-rule-header-actions>button{opacity:0;pointer-events:none}
+ .nk-app .nk-rule-head:hover .nk-rule-header-actions>button,
+ .nk-app .nk-rule-head:has(:focus-visible) .nk-rule-header-actions>button,
+ .nk-app .nk-rule-head:has(.nk-rule-name:focus) .nk-rule-header-actions>button{opacity:1;pointer-events:auto}
+}

@@ -1,0 +1,11 @@
+{
+  "sources": [],
+  "default": "direct",
+  "socksPort": 1080,
+  "wanInterface": "eth0",
+  "rules": [
+    {"domains": ["dpi.example"], "action": "zapret"},
+    {"domains": ["blocked.example"], "action": "block"}
+  ],
+  "zapretArgs": ["--filter-tcp=80,443", "--dpi-desync=fake", "--dpi-desync-ttl=2"]
+}

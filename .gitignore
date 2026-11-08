@@ -1,0 +1,51 @@
+/result
+/build/
+/nadkop
+__pycache__/
+*.pyc
+*.pyo
+node_modules/
+*.log
+.DS_Store
+*~
+.venv/
+
+# Binaries and archives (even outside build/)
+*.apk
+*.ipk
+*.tar.gz
+*.qcow2
+*.raw
+*.img
+
+# Go artifacts
+coverage.out
+*.out
+*.test
+
+# OpenWrt SDK leftovers
+sdk/
+staging_dir/
+tmp/
+bin/
+
+# Secrets and environment
+id_ed25519*
+id_rsa*
+*.pem
+known_hosts
+.env
+.env.*
+
+# Machine-generated reports (keep curated *.md)
+reports/logs/
+reports/runs/
+reports/*.json
+reports/**/*.json
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn

@@ -1,0 +1,16 @@
+{
+  "sources": [],
+  "rules": [],
+  "default": "direct",
+  "socksPort": 1080,
+  "transparent": {
+    "enabled": false,
+    "interfaces": ["br-lan"],
+    "port": 12345,
+    "dnsPort": 1053,
+    "dnsUpstream": "127.0.0.1",
+    "ipv6": true
+  },
+  "updateIntervalHours": 6,
+  "zapretArgs": ["--filter-tcp=80,443", "--filter-udp=443", "--dpi-desync=fake", "--dpi-desync-ttl=2"]
+}

@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go ${{ matrix.go }} — vet, fmt, build, test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.23', '1.24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: gofmt (only real sources, build/ is gitignored)
+        run: |
+          out=$(gofmt -l cmd internal)
+          if [ -n "$out" ]; then
+            echo "gofmt findings (fix before merge):"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go build
+        run: go build -o build/nadkop ./cmd/nadkop
+
+      - name: validate example config
+        run: ./build/nadkop validate -config examples/config.json
+
+      - name: Version consistency (bump-version.sh --check)
+        run: bash scripts/bump-version.sh --check
+
+      - name: go test
+        run: go test ./...
+
+  lint:
+    name: shellcheck + node --check + py_compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          targets=$(git ls-files '*.sh' ':!:build/*')
+          for f in openwrt/nadkop/files/nadkop.init openwrt/nadkop/files/usr/libexec/rpcd/nadkop; do
+            [ -f "$f" ] && targets="$targets $f"
+          done
+          # shellcheck disable=SC2086
+          shellcheck -S warning $targets
+
+      - name: node --check (LuCI JS + .mjs, syntax only)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          git ls-files '*.js' '*.mjs' ':!:build/*' | while IFS= read -r f; do
+            node --check "$f" || exit 1
+          done
+
+      - name: python syntax (audit/test helpers)
+        run: |
+          git ls-files '*.py' ':!:build/*' | while IFS= read -r f; do
+            python3 -m py_compile "$f" || exit 1
+          done
