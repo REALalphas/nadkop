@@ -6,12 +6,6 @@
 
 Selective routing for OpenWrt: matching domains go through a proxy (Xray), DPI-blocked ones go through circumvention (nfqws/Zapret), everything else goes direct. Rules are `direct` / `proxy` / `block` / `zapret`, multiple subscriptions are supported, configuration lives in the LuCI web UI (Services → nadkop).
 
-## Why run it
-
-- Open blocked sites without pushing all traffic through a VPN: only the domains in your rules get proxied.
-- Block ads and trackers at the router — once, for every device on the LAN.
-- Bypass DPI blocks without installing a circumvention client on each device.
-
 ## Install
 
 ```sh
@@ -20,7 +14,13 @@ uclient-fetch -O /tmp/get-nadkop.sh BASE_URL/get-nadkop.sh && sh /tmp/get-nadkop
 
 Then open LuCI → Services → nadkop, add a subscription and enable the rules you need.
 
-## Further reading
+## Why run it
+
+- Open blocked sites without pushing all traffic through a VPN: only the domains in your rules get proxied.
+- Block ads and trackers at the router — once, for every device on the LAN.
+- Bypass DPI blocks without installing a circumvention client on each device.
+
+## Learn more
 
 - `docs/openwrt-vm.md` — detailed installation and verification on a test VM.
 - `docs/product-contract.md` — what the product can and cannot do.
