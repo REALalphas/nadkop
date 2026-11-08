@@ -9,7 +9,7 @@ Selective routing for OpenWrt: matching domains go through a proxy (Xray), DPI-b
 ## Install
 
 ```sh
-uclient-fetch -O /tmp/get-nadkop.sh BASE_URL/get-nadkop.sh && sh /tmp/get-nadkop.sh BASE_URL
+uclient-fetch -O /tmp/get-nadkop.sh https://github.com/REALalphas/nadkop/releases/latest/download/get-nadkop.sh && sh /tmp/get-nadkop.sh
 ```
 
 Then open LuCI → Services → nadkop, add a subscription and enable the rules you need.

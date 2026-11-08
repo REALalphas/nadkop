@@ -136,6 +136,8 @@ html:has(.nk-app){scrollbar-gutter:stable}
 .nk-app .nk-runtime-line{display:flex;align-items:center;justify-content:space-between;gap:1em}
 .nk-app .nk-runtime-line>span{display:inline-flex;align-items:center;gap:.4em;white-space:nowrap}
 .nk-app .nk-runtime-checks [data-state=error] .nk-runtime-line>span{color:var(--error-color-high,var(--error-color,#e05252))}
+.nk-app .nk-runtime-checks [data-state=warning] .nk-runtime-line>span{color:var(--warn-color-high,var(--warn-color,#b7791f))}
+.nk-app .nk-diagnostic-steps [data-state=warning]>summary{color:var(--warn-color-high,var(--warn-color,#b7791f))}
 .nk-app .nk-probe-result{max-width:12em;min-width:0;overflow:hidden;text-overflow:ellipsis}
 
 /* Share the exact status/footer tracks with the name/protocol tracks. */

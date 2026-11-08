@@ -1,0 +1,79 @@
+name: Auto-release
+
+# Tags a release automatically when a version bump lands on main.
+# The v* tag push then triggers the Release workflow (heavy SDK builds
+# live there, not here). A tag pushed with GITHUB_TOKEN would NOT trigger
+# it, so the tag is pushed with RELEASE_PAT (a PAT with contents:write).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'openwrt/nadkop/Makefile'
+      - 'openwrt/luci-app-nadkop/Makefile'
+      - 'openwrt/nadkop-nfqws/Makefile'
+      - 'scripts/get-nadkop.sh'
+      - 'openwrt/luci-app-nadkop/htdocs/luci-static/resources/view/nadkop/overview.js'
+      # Included so that filling in the CHANGELOG after a bump retries
+      # the release on the next push.
+      - 'CHANGELOG.md'
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version consistency
+        run: bash scripts/bump-version.sh --check
+
+      - name: Derive tag, check changelog
+        id: ver
+        run: |
+          set -eu
+          ui="$(awk -F':=' '/^PKG_VERSION:=/{v=$2} /^PKG_RELEASE:=/{r=$2} END{printf "%s-r%s", v, r}' openwrt/luci-app-nadkop/Makefile | tr -d '[:space:]')"
+          echo "ui=$ui" >> "$GITHUB_OUTPUT"
+          echo "tag=v$ui" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$ui" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v$ui already exists (e.g. a split bump without a UI change) — nothing to do."
+            exit 0
+          fi
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          # bump-version.sh leaves a TODO skeleton: refuse to release it.
+          python3 - "$ui" <<'PY'
+          import sys
+          ui = sys.argv[1]
+          lines = open('CHANGELOG.md', encoding='utf-8').read().splitlines()
+          start = next((i for i, l in enumerate(lines) if ui in l), None)
+          if start is None:
+              sys.exit(f'CHANGELOG has no section mentioning {ui}; fill it, then push again.')
+          end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith('## ')), len(lines))
+          if 'TODO: describe' in '\n'.join(lines[start:end]):
+              sys.exit(f'CHANGELOG section for {ui} still has the TODO placeholder; fill it, then push again.')
+          print(f'CHANGELOG section for {ui} is filled in.')
+          PY
+
+      - name: Create and push tag
+        if: steps.ver.outputs.exists != 'true'
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -eu
+          if [ -z "${RELEASE_PAT:-}" ]; then
+            echo '::error::RELEASE_PAT secret is not set. Add a PAT with contents:write (repo Settings -> Secrets and variables -> Actions) so the tag push triggers the Release workflow; a GITHUB_TOKEN push would not.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$TAG" -m "Release $TAG"
+          git push "https://x-access-token:${RELEASE_PAT}@github.com/${GITHUB_REPOSITORY}.git" "$TAG"

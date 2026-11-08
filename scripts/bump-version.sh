@@ -155,4 +155,5 @@ PY
 fi
 
 echo "bumped: core=$core_v-r$core_r ui=$ui_v-r$ui_r nfqws=$nfqws"
-echo 'next: fill CHANGELOG, then: git add -A && git commit && git tag v<ui-full> && git push --follow-tags'
+echo 'next: fill CHANGELOG (replace the TODO), then: git add -A && git commit && git push'
+echo 'auto-release will tag v<ui-full> on main and publish the GitHub release'

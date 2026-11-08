@@ -89,6 +89,16 @@ func (b backend) runtimeChecks(ctx context.Context, run commandRunner, instances
 	} else {
 		add("runtime-lan", "LAN and DNS routing", "info", "Transparent routing is not applied. Enable it and select LAN devices in settings.")
 	}
+	if podkop := detectPodkop(ctx, run); podkop.Present() {
+		if podkop.Active() {
+			needZapret := applied && zapretRequired
+			add("runtime-podkop", "Podkop coexistence", "warning", podkopWarning(needZapret)+".")
+		} else if zapretRequired && applied {
+			add("runtime-podkop", "Podkop coexistence", "warning", podkopWarning(true)+".")
+		} else {
+			add("runtime-podkop", "Podkop coexistence", "info", podkopWarning(false)+".")
+		}
+	}
 	if err == nil && plan.UpdateIntervalHours > 0 {
 		if running("updater") {
 			add("runtime-updater", "Subscription updates", "ok", "Automatic updates are enabled with validation before replacing the configuration.")

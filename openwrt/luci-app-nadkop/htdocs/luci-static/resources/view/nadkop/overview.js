@@ -206,8 +206,8 @@ return view.extend({
    });
    var activeButton = serviceControls.contains(document.activeElement) ? document.activeElement.textContent : '';
    domReplace(runtimeBox, checks.map(function(check) {
-    var line=[E('strong',{},[check.title==='Xray'?'Xray (VPN)':check.title]),E('span',{},[picker.icon({ok:'circle-check',success:'circle-check',error:'circle-x',info:'circle-alert',pending:'loader-circle',unknown:'circle-alert'}[check.state]||'circle-alert'),({ok:'Running',success:'Completed',error:'Error',info:'Not used',pending:'In progress',unknown:'No data'}[check.state]||check.state)])];
-    return E('li',{'data-state':check.state},[['error','success','pending','unknown'].indexOf(check.state)>=0?E('details',{'data-check-id':check.id,open:openChecks[check.id]?'':null},[E('summary',{'class':'nk-runtime-line'},line),E('p',{},[check.detail])]):E('div',{'class':'nk-runtime-line'},line)]);
+    var line=[E('strong',{},[check.title==='Xray'?'Xray (VPN)':check.title]),E('span',{},[picker.icon({ok:'circle-check',success:'circle-check',warning:'circle-alert',error:'circle-x',info:'circle-alert',pending:'loader-circle',unknown:'circle-alert'}[check.state]||'circle-alert'),({ok:'Running',success:'Completed',warning:'Warning',error:'Error',info:'Not used',pending:'In progress',unknown:'No data'}[check.state]||check.state)])];
+    return E('li',{'data-state':check.state},[['error','success','pending','unknown','warning'].indexOf(check.state)>=0?E('details',{'data-check-id':check.id,open:openChecks[check.id]?'':null},[E('summary',{'class':'nk-runtime-line'},line),E('p',{},[check.detail])]):E('div',{'class':'nk-runtime-line'},line)]);
    }));
    if (focusedCheck) Array.prototype.some.call(runtimeBox.querySelectorAll('details'), function(el) {
     if (el.getAttribute('data-check-id') !== focusedCheck) return false;
@@ -439,14 +439,14 @@ return view.extend({
    keydown: function(ev) { if (ev.key === 'Enter') { ev.preventDefault(); submitSource(); } }
   });
   function renderDiagnostics(result) {
-   var labels = { ok: 'Done', error: 'Error', skipped: 'Skipped', pending: 'Pending' };
-   domReplace(diagnosticBox, [E('p', { role: 'status' }, [result.ok ? 'Check passed' : 'Check failed']),
+   var labels = { ok: 'Done', error: 'Error', warning: 'Warning', skipped: 'Skipped', pending: 'Pending' };
+   domReplace(diagnosticBox, [E('p', { role: 'status' }, [result.ok ? 'Check passed' + ((result.steps || []).some(function(s) { return s.state === 'warning'; }) ? ' with warnings' : '') : 'Check failed']),
     E('ol', { 'class': 'nk-diagnostic-steps' }, (result.steps || []).map(function(step) {
      var row = E('details', { 'data-step': step.id, 'data-state': step.state }, [
       E('summary', {}, [(step.title==='Xray'?'Xray (VPN)':step.title) + ' · ' + (labels[step.state] || step.state)]),
       E('p', {}, [step.detail || '—']), E('small', {}, [String(step.durationMs || 0) + ' ms'])
      ]);
-     row.open = step.state === 'error';
+     row.open = step.state === 'error' || step.state === 'warning';
      return E('li', {}, [row]);
     }))]);
   }

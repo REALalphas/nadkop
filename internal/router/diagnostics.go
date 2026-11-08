@@ -41,6 +41,10 @@ func (r *diagnosticReport) step(id, detail string, fn func() error) error {
 			s.DurationMS, s.Detail, s.State = time.Since(start).Milliseconds(), detail, "ok"
 			if err != nil {
 				s.State, s.Detail = "error", err.Error()
+				var warn *coexistenceWarning
+				if errors.As(err, &warn) {
+					s.State = "warning"
+				}
 			}
 		}
 	}
@@ -68,6 +72,7 @@ func (b backend) diagnose(ctx context.Context, run commandRunner) diagnosticRepo
 		{ID: "xray", Title: "Xray", State: "pending"},
 		{ID: "nfqws", Title: "Zapret", State: "pending"},
 		{ID: "nftables", Title: "nftables", State: "pending"},
+		{ID: "coexistence", Title: "Coexistence", State: "pending"},
 	}}
 	var c core.Config
 	var nodes []core.Node
@@ -109,6 +114,26 @@ func (b backend) diagnose(ctx context.Context, run commandRunner) diagnosticRepo
 		dir, err = b.prepareSteps(ctx, c, nodes, run, &report)
 		if dir != "" {
 			os.RemoveAll(dir)
+		}
+	}
+	if err == nil {
+		err = report.step("coexistence", "No conflicting software detected", func() error {
+			st := detectPodkop(ctx, run)
+			if !st.Present() {
+				return nil
+			}
+			needZapret := false
+			for _, r := range c.Rules {
+				if r.Action == "zapret" {
+					needZapret = true
+					break
+				}
+			}
+			return &coexistenceWarning{detail: podkopWarning(needZapret) + "."}
+		})
+		if _, ok := err.(*coexistenceWarning); ok {
+			report.Error = ""
+			err = nil
 		}
 	}
 	report.OK = err == nil

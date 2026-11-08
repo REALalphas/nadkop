@@ -25,7 +25,7 @@ fi
 
 if command -v apk >/dev/null 2>&1; then
 	# Order: installer expects nfqws, core, LuCI.
-	FILES="nadkop-nfqws-${NFQWS}.apk nadkop-${CORE}.apk luci-app-nadkop-${UI}.apk"
+	FILES="nadkop-nfqws-${NFQWS}-${ARCH}.apk nadkop-${CORE}-${ARCH}.apk luci-app-nadkop-${UI}.apk"
 elif command -v opkg >/dev/null 2>&1; then
 	FILES="nadkop-nfqws_${NFQWS}_${ARCH}.ipk nadkop_${CORE}_${ARCH}.ipk luci-app-nadkop_${UI}_all.ipk"
 else

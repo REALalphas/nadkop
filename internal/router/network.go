@@ -196,6 +196,12 @@ func checkNetwork(ctx context.Context, plan core.RuntimeSettings, run commandRun
 			return err
 		}
 	}
+	// Podkop transparent interception (sing-box TPROXY + dnsmasq hijack) is
+	// incompatible with Nadkop transparent routing: both claim FakeDNS
+	// ranges, both hook prerouting/mangle, both intercept port 53.
+	if detectPodkop(ctx, run).Active() {
+		return errors.New(podkopRefusal())
+	}
 	return nil
 }
 

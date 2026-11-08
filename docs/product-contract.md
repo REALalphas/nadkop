@@ -87,8 +87,16 @@ that tests must not present as traffic-decryption support.
 Reserved: inet nadkop, NFQUEUE 200, bit 0x10000, routing table 100,
 policy-rule priority 10000, internal health ports 61080/61081.
 Pre-apply checks detect busy ports, a missing LAN interface,
-a busy table/mark/priority, missing firewall4, and enabled flow offloading.
+a busy table/mark/priority, missing firewall4, enabled flow offloading,
+and live Podkop interception (its `inet PodkopTable`, fwmark 0x100000 policy
+route, or dnsmasq hijack to 127.0.0.42): transparent routing is refused while
+Podkop intercepts LAN/DNS, because both claim the same FakeDNS ranges and
+prerouting hooks. A merely installed but idle Podkop does not block.
 Unsuitable settings are rejected; third-party service settings are not rewritten.
+A non-fatal `coexistence` diagnostic step (and runtime check) warns when Podkop
+traces are present: its sing-box upstream TLS passes Nadkop's Zapret NFQUEUE
+(mark 0x100000 does not bypass the 0x60000000 mask), so list Podkop VPN
+endpoints in Zapret bypass prefixes or disable Zapret rules.
 
 Xray config, hostlist/ipset, nft, and runtime.json are published as one directory
 with private files. Before procd is updated: load, compile,

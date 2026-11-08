@@ -35,7 +35,7 @@ func TestDiagnosticStepsSuccessFailureAndCleanup(t *testing.T) {
 				}
 				return nil, nil
 			})
-			if len(report.Steps) != 6 || report.OK != (failure == "") {
+			if len(report.Steps) != 7 || report.OK != (failure == "") {
 				t.Fatalf("bad report: %+v", report)
 			}
 			failed := -1
@@ -53,7 +53,7 @@ func TestDiagnosticStepsSuccessFailureAndCleanup(t *testing.T) {
 			if failure != "" && (failed < 0 || len(commands) != failed-2) {
 				t.Fatalf("wrong failed stage/calls: %+v %v", report, commands)
 			}
-			if failure == "" && strings.Join(commands, ",") != "xray,nfqws,nft" {
+			if failure == "" && strings.Join(commands, ",") != "xray,nfqws,nft,ip,ip,uci,sh" {
 				t.Fatal(commands)
 			}
 			data, _ := json.Marshal(report)
@@ -110,7 +110,14 @@ func TestDiagnosticDirectOnlySkipsZapret(t *testing.T) {
 		t.Fatal(err)
 	}
 	report := b.diagnose(context.Background(), func(ctx context.Context, name string, args ...string) ([]byte, error) {
-		if filepath.Base(name) != "xray" && filepath.Base(name) != "ubus" {
+		// Coexistence detection runs its own nft/ip/uci/sh probes even for a
+		// direct-only configuration; it never fails the check.
+		switch filepath.Base(name) {
+		case "xray", "ubus", "nft", "ip", "uci", "sh":
+		default:
+			t.Fatal("unnecessary Zapret check", name)
+		}
+		if filepath.Base(name) == "nft" && len(args) > 0 && args[0] == "-c" {
 			t.Fatal("unnecessary Zapret check")
 		}
 		return nil, nil

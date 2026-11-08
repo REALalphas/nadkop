@@ -123,12 +123,15 @@ jobs:
           set -eu
           mkdir -p release/
           cp artifacts/host-*/nadkop-linux-* release/
-          # Collect packages; disambiguate APK names per arch (upstream names collide).
+          # Collect packages; disambiguate arch-specific APK names per arch
+          # (upstream names collide). The arch-independent LuCI package
+          # (LUCI_PKGARCH=all) is identical for every target: copy once.
           for combo in apk-x86_64 apk-aarch64 ipk-x86_64 ipk-aarch64; do
             arch="${combo##*-}"
             for p in artifacts/owrt-"$combo"-*/nadkop*.apk artifacts/owrt-"$combo"-*/*.ipk; do
               [ -e "$p" ] || continue
               case "$p" in
+                *luci-app-nadkop*.apk) cp "$p" release/ ;;
                 *.apk) cp "$p" "release/$(basename "$p" .apk)-${arch}.apk" ;;
                 *) cp "$p" release/ ;;
               esac
