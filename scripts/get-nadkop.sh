@@ -11,7 +11,7 @@ BASE_URL="${1:-}"
 ARCH="${2:-$(uname -m)}"
 # Pinned release; override with NADKOP_CORE / NADKOP_UI / NADKOP_NFQWS env.
 CORE="${NADKOP_CORE:-0.3.0-r6}"
-UI="${NADKOP_UI:-0.3.0-r11}"
+UI="${NADKOP_UI:-0.3.0-r12}"
 NFQWS="${NADKOP_NFQWS:-2026.11.01-r1}"
 
 if [ ! -r /etc/openwrt_release ] || [ "$(id -u)" != 0 ]; then

@@ -79,3 +79,6 @@ jobs:
           git ls-files '*.py' ':!:build/*' | while IFS= read -r f; do
             python3 -m py_compile "$f" || exit 1
           done
+
+      - name: Release workflow regression checks
+        run: python3 scripts/test-release.py

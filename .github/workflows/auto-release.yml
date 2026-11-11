@@ -31,6 +31,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # The push URL supplies RELEASE_PAT; a persisted GITHUB_TOKEN
+          # Authorization header would override it and suppress workflows.
+          persist-credentials: false
 
       - name: Version consistency
         run: bash scripts/bump-version.sh --check

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-12 — core 0.3.0-r6, LuCI 0.3.0-r12
+
+- Fix automatic release tagging so the release token is used without a
+  persisted checkout authorization header overriding it.
+- Fix GitHub Actions expression parsing in the generated release installer.
+- Update OpenWrt SDK URLs and build prerequisites for APK and IPK builds.
+- Include the LuCI APK and normalize architecture names in IPK release
+  assets to match the installer download names.
+- Add local release workflow regression checks to CI.
+
 ## 2026-11-05 — core 0.3.0-r6, LuCI 0.3.0-r10…r11
 
 Install details: `docs/openwrt-vm.md`; check results are recorded

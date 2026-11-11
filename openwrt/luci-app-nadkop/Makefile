@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_VERSION:=0.3.0
-PKG_RELEASE:=11
+PKG_RELEASE:=12
 LUCI_TITLE:=LuCI support for Nadkop
 LUCI_DEPENDS:=+luci-base +nadkop
 LUCI_PKGARCH:=all

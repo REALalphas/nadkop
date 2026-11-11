@@ -1193,7 +1193,7 @@ return view.extend({
    tabbar.appendChild(li);
   });
   var root = E('div', { 'class': 'cbi-map nk-app' }, [
-   E('link', { rel: 'stylesheet', href: L.resource('nadkop/picker.css') + '?v=0.3.0-r11' }),
+   E('link', { rel: 'stylesheet', href: L.resource('nadkop/picker.css') + '?v=0.3.0-r12' }),
    E('div', { 'class': 'nk-heading' }, [E('h2', {}, ['Nadkop']), statusBox]),
    tabbar, panes,
    E('div', { 'class': 'cbi-page-actions' }, [dirty, resetButton, button('Save', function() { return save(false); }),
