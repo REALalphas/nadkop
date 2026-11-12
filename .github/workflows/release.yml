@@ -98,7 +98,7 @@ jobs:
       - name: Prepare feeds (pinned upstream + golang)
         working-directory: /tmp/sdk
         run: |
-          ./scripts/feeds update packages luci
+          ./scripts/feeds update base packages luci
           ./scripts/feeds install -p packages golang
       - name: Build nadkop packages
         run: bash "$GITHUB_WORKSPACE/scripts/build-openwrt.sh" /tmp/sdk "$GITHUB_WORKSPACE/dist/${{ matrix.combo }}"
