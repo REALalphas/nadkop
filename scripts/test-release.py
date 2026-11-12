@@ -152,7 +152,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         for name, source in {
                 pkgtype if pkgtype == 'apk' else 'opkg': '#!/bin/sh\nexit 0\n',
                 'id': '#!/bin/sh\necho 0\n',
-                'uclient-fetch': '#!/bin/sh\ncp "${3#fixture://}" "$2"\n'}.items():
+                'uclient-fetch': '#!/bin/sh\ncp "${3#https://fixture.invalid}" "$2"\n'}.items():
             path = bindir / name
             path.write_text(source)
             path.chmod(0o755)
@@ -163,7 +163,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         source = source.replace('/tmp/nadkop-dl.XXXXXX', str(self.work / 'downloads.XXXXXX'))
         path = self.work / 'getter.sh'
         path.write_text(source)
-        result = self.execute('sh getter.sh "fixture://$REMOTE" x86_64',
+        result = self.execute('sh getter.sh "https://fixture.invalid$REMOTE" x86_64',
                               REMOTE=str(remote), PATH=str(bindir) + os.pathsep + os.environ['PATH'])
         return result, marker
 

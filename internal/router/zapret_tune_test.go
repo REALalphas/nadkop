@@ -669,3 +669,42 @@ func TestTuneSearchPreservesCandidateCodes(t *testing.T) {
 		}
 	}
 }
+
+func TestTuneFailedStartRemovesUnstartedJob(t *testing.T) {
+	for _, failAt := range []string{"active", "worker"} {
+		t.Run(failAt, func(t *testing.T) {
+			b := fixture(t)
+			_, _, rev, err := b.read()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(b.tuneRoot(), 0700); err != nil {
+				t.Fatal(err)
+			}
+			run := func(context.Context, string, ...string) ([]byte, error) {
+				if failAt == "active" {
+					// Fail publication after the initial active-pointer check.
+					if err := os.Mkdir(filepath.Join(b.tuneRoot(), "active"), 0700); err != nil {
+						t.Fatal(err)
+					}
+				}
+				return nil, nil
+			}
+			_, err = b.tuneStartWith(context.Background(), request{Revision: rev, WAN: "eth0", Targets: []string{"one.example"}, Protocols: []string{"https"}}, run, func(*exec.Cmd) error {
+				return errors.New("worker start failed")
+			})
+			if err == nil {
+				t.Fatal("failed start accepted")
+			}
+			entries, err := os.ReadDir(b.tuneRoot())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range entries {
+				if tuneIDPattern.MatchString(entry.Name()) || (failAt == "worker" && entry.Name() == "active") {
+					t.Fatal("unstarted job left behind", entry.Name())
+				}
+			}
+		})
+	}
+}

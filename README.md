@@ -1,3 +1,5 @@
+![Nadkop — selective routing for OpenWrt](docs/assets/nadkop-banner.svg)
+
 # Nadkop
 
 [![CI](https://github.com/REALalphas/nadkop/actions/workflows/ci.yml/badge.svg)](https://github.com/REALalphas/nadkop/actions/workflows/ci.yml)
@@ -40,8 +42,6 @@ and enable transparent routing. Stop Podkop interception before enabling it.
 ## License
 
 AGPL-3.0-or-later, see [LICENSE](LICENSE).
-
-Copyright (C) 2026 REALalphas.
 
 Third-party components retain their upstream licenses:
 

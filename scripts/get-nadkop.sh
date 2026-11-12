@@ -22,6 +22,10 @@ if [ -z "$BASE_URL" ]; then
 	echo "Usage: $0 BASE_URL [ARCH]" >&2
 	exit 1
 fi
+case "$BASE_URL" in
+	https://*) ;;
+	*) echo 'BASE_URL must use HTTPS.' >&2; exit 1 ;;
+esac
 case "$ARCH" in
 	x86_64|aarch64) ;;
 	*) echo "Unsupported release architecture: $ARCH. Build with the SDK for your router target." >&2; exit 1 ;;

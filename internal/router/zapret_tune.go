@@ -221,10 +221,22 @@ func (b backend) tuneStartWith(ctx context.Context, r request, run commandRunner
 	}
 	j := tuneJob{ID: hex.EncodeToString(random[:]), Status: "queued", Message: "Preparing check", Revision: rev, WAN: r.WAN,
 		Targets: targets, Protocols: protocols, Strategies: tuneStrategies(), Results: []tuneProbe{}, StartedAt: time.Now().Unix(), ExpiresAt: time.Now().Add(tuneDuration).Unix()}
+	// Failed candidates use at most three rounds; the winning/final candidate
+	// may use four, after which the search always returns. Include baseline.
 	j.Total = len(targets) * len(protocols) * (1 + 3*len(j.Strategies) + 1)
 	if err = os.Mkdir(b.tuneDir(j.ID), 0700); err != nil {
 		return nil, errors.New("Failed to create check")
 	}
+	started := false
+	defer func() {
+		if !started {
+			_ = os.RemoveAll(b.tuneDir(j.ID))
+			active := filepath.Join(b.tuneRoot(), "active")
+			if data, err := os.ReadFile(active); err == nil && strings.TrimSpace(string(data)) == j.ID {
+				_ = os.Remove(active)
+			}
+		}
+	}()
 	if err = b.writeTune(j); err != nil {
 		return nil, errors.New("Failed to write check")
 	}
@@ -254,10 +266,9 @@ func (b backend) tuneStartWith(ctx context.Context, r request, run commandRunner
 	cmd := exec.Command("/usr/bin/nadkop", "zapret-worker", j.ID)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err = start(cmd); err != nil {
-		j.Status, j.Message, j.Restored = "failed", "Failed to start check", true
-		_ = b.writeTune(j)
-		return nil, errors.New(j.Message)
+		return nil, errors.New("Failed to start check")
 	}
+	started = true
 	go cmd.Wait()
 	return map[string]any{"job": j.public()}, nil
 }

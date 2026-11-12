@@ -398,7 +398,11 @@ func (b backend) call(ctx context.Context, method string, r request) (any, error
 		}
 		defer unlock()
 		if method == "service" && r.Action != "start" && r.Action != "restart" {
-			if _, err := command(ctx, "/etc/init.d/nadkop", r.Action); err != nil {
+			// ui.lock is held here, so tell the init script not to acquire
+			// it again; a second non-blocking flock from a child would fail.
+			cmd := exec.CommandContext(ctx, "/etc/init.d/nadkop", r.Action)
+			cmd.Env = append(os.Environ(), "NADKOP_UI_LOCKED=1")
+			if _, err := cmd.Output(); err != nil {
 				return nil, errors.New("Service operation failed")
 			}
 			return map[string]any{"ok": true}, nil
