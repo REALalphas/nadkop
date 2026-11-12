@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Serialize direct service stop and shutdown with configuration and service
+  operations. Refuse a busy stop before removing network rules or processes.
+- Validate the future server catalogue before saving an imported subscription,
+  and save the source before publishing catalogue records. A failed config
+  write no longer leaves an orphan source namespace behind.
+- Remove unstarted Zapret tuning jobs and their active pointer when startup
+  fails.
+- Require HTTPS for release downloads and attempt local package installation
+  before refreshing package repositories, allowing installation without network
+  access when dependencies are already available.
+
 ## 2026-11-12 — core 0.3.0-r6, LuCI 0.3.0-r13
 
 - Normalize stock IPK `-N` package revisions to the `-rN` release asset names
