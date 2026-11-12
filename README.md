@@ -6,13 +6,22 @@
 
 Selective routing for OpenWrt: matching domains go through a proxy (Xray), DPI-blocked ones go through circumvention (nfqws/Zapret), everything else goes direct. Rules are `direct` / `proxy` / `block` / `zapret`, multiple subscriptions are supported, configuration lives in the LuCI web UI (Services → nadkop).
 
+## Supported platforms
+
+Release packages target OpenWrt 25.12 (APK) and 24.10 (IPK) on x86_64
+and ARM64 (`aarch64_generic`). ARM64 devices with a different OpenWrt package
+ABI and other targets need a build with their matching SDK. See the
+[installation guide](docs/install.md) for dependencies and upgrade instructions.
+
 ## Install
 
 ```sh
 uclient-fetch -O /tmp/get-nadkop.sh https://github.com/REALalphas/nadkop/releases/latest/download/get-nadkop.sh && sh /tmp/get-nadkop.sh
 ```
 
-Then open LuCI → Services → nadkop, add a subscription and enable the rules you need.
+Then open LuCI → Services → nadkop, add a subscription and configure your rules.
+To route LAN traffic, select the LAN devices, disable firewall flow offloading,
+and enable transparent routing. Stop Podkop interception before enabling it.
 
 ## Why run it
 
@@ -22,10 +31,11 @@ Then open LuCI → Services → nadkop, add a subscription and enable the rules 
 
 ## Learn more
 
-- `docs/openwrt-vm.md` — detailed installation and verification on a test VM.
+- [Installation](docs/install.md) — packages, upgrades, and source builds.
+- [OpenWrt testbed](docs/openwrt-vm.md) — verification on an isolated VM.
 - `docs/product-contract.md` — what the product can and cannot do.
 - `docs/interface.md` — UI and rules; `docs/zapret-tuner.md` — DPI strategy tuner.
-- `examples/config.json` — sample configuration for local checks (`AGENTS.md` has the commands).
+- `examples/config.json` — sample configuration; see [Contributing](CONTRIBUTING.md) for build and test commands.
 
 ## License
 

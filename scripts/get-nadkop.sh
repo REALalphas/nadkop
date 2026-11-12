@@ -11,7 +11,7 @@ BASE_URL="${1:-}"
 ARCH="${2:-$(uname -m)}"
 # Pinned release; override with NADKOP_CORE / NADKOP_UI / NADKOP_NFQWS env.
 CORE="${NADKOP_CORE:-0.3.0-r6}"
-UI="${NADKOP_UI:-0.3.0-r12}"
+UI="${NADKOP_UI:-0.3.0-r13}"
 NFQWS="${NADKOP_NFQWS:-2026.11.01-r1}"
 
 if [ ! -r /etc/openwrt_release ] || [ "$(id -u)" != 0 ]; then
@@ -22,6 +22,10 @@ if [ -z "$BASE_URL" ]; then
 	echo "Usage: $0 BASE_URL [ARCH]" >&2
 	exit 1
 fi
+case "$ARCH" in
+	x86_64|aarch64) ;;
+	*) echo "Unsupported release architecture: $ARCH. Build with the SDK for your router target." >&2; exit 1 ;;
+esac
 
 if command -v apk >/dev/null 2>&1; then
 	# Order: installer expects nfqws, core, LuCI.
@@ -47,8 +51,8 @@ fetch() {
 	fi
 }
 
-DL=/tmp/nadkop-dl
-mkdir -p "$DL"
+umask 077
+DL="$(mktemp -d /tmp/nadkop-dl.XXXXXX)"
 cd "$DL"
 fetch "$BASE_URL/install-openwrt.sh" "$DL/install-openwrt.sh"
 fetch "$BASE_URL/sha256sums" "$DL/sha256sums"
@@ -59,8 +63,8 @@ for f in $FILES; do
 done
 # Verify only the files we are about to install.
 : > "$DL/nk.sums"
-for f in $FILES; do
-	grep -F "  $f" "$DL/sha256sums" >> "$DL/nk.sums" || {
+for f in install-openwrt.sh $FILES; do
+	awk -v name="$f" '$2 == name { print; found=1 } END { exit !found }' "$DL/sha256sums" >> "$DL/nk.sums" || {
 		echo "Checksum entry missing for $f." >&2
 		exit 1
 	}

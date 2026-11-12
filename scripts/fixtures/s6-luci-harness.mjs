@@ -168,7 +168,9 @@ export async function s6OpenFixture(browser, sources, options = {}) {
       }
     },
     async s6Ready() {
-      await page.waitForFunction(() => document.querySelector('.cbi-page-actions button') && !document.querySelector('.cbi-page-actions button').disabled);
+      // Discard stays disabled for a clean draft; Save reflects the busy state.
+      await page.getByRole('button', {name: 'Save', exact: true}).waitFor();
+      await page.waitForFunction(() => [...document.querySelectorAll('.cbi-page-actions button')].some(button => button.textContent.trim() === 'Save' && !button.disabled));
     },
     async s6CleanErrors() {
       assert.deepEqual(errors, [], 'Uncaught browser errors');

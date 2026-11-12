@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-12 — core 0.3.0-r6, LuCI 0.3.0-r13
+
+- Normalize stock IPK `-N` package revisions to the `-rN` release asset names
+  expected by the installer, including the architecture-independent LuCI package.
+- Verify the downloaded installer checksum before execution and use a private,
+  unique download directory. Reject unsupported release architectures early.
+- Require Go tests, vet, matching release tags, and release regression checks
+  before building and publishing; serialize publication for the same release.
+- Validate version bump input before writing, check the nfqws pin, and create
+  changelog entries for UI-only releases. Match exact LuCI versions in notes.
+- Remove a duplicate VPN label and correct the corresponding UI assertion.
+- Document supported package ABIs, upgrades and private security reporting.
+- Remove internal audit reports and obsolete audit orchestration from the
+  public source tree; keep local guidance out of source release archives.
+
 ## 2026-11-12 — core 0.3.0-r6, LuCI 0.3.0-r12
 
 - Fix automatic release tagging so the release token is used without a
@@ -12,27 +27,17 @@
 
 ## 2026-11-05 — core 0.3.0-r6, LuCI 0.3.0-r10…r11
 
-Install details: `docs/openwrt-vm.md`; check results are recorded
-in local `verification.json` (not published). The r6/r10 Go core was
-reconciled against the internal manifest (419 files, 0 differences); for r11 only
-3 static files were reconciled.
-
-- r6/r10: final X2/Zapret tuner bundle; 91 outbounds in candidate-preflight,
-  Xray `Configuration OK`; the catalogue updated normally (37 IDs, 7 separators,
-  0 unresolved links); `keep.d/nadkop` includes `.save-state.json`.
-- Known limitation of the new diagnostics: `runtime-monitor-action` stays
-  `unknown` because `/var` is a symlink to `/tmp` and `monitor.go` writes
-  `monitor-status.json` only on an exact `runtimeRoot` (`internal/core/monitor.go`).
-- r11 (LuCI only): background tuner polling no longer resets focus/input,
-  diagnostics no longer closes open `details`, flag URL fixed,
-  `picker.css` cache-buster `?v=0.3.0-r11`. Checks: tuner UI 30/30, product-UI
-  and picker pass; `go test` was not rerun (Go code unchanged).
-- Update: `install-openwrt.sh` repeats `validate` and `apply` on a
-  `ui.lock` race from the post-upgrade hook (3 attempts, 2/5/10s delays).
+- Add the Zapret strategy tuner and expanded runtime diagnostics.
+- Preserve focus and input during background tuner polling and keep open
+  diagnostic sections when their state has not changed.
+- Correct local flag URLs and update the stylesheet cache version.
+- Retry installer validation and apply when a concurrent package hook holds
+  the configuration lock.
+- Include the interrupted-save marker in sysupgrade backups.
 
 ## 2026-11-03 — core 0.3.0-r5, LuCI 0.3.0-r9
 
-Upgrade from core 0.3.0-r4 and LuCI 0.3.0-r8. Includes the accepted C1–C4 fixes and X1 rework.
+Improve configuration safety, service recovery and LuCI accessibility.
 
 ### Saving and subscriptions
 
@@ -64,11 +69,11 @@ Upgrade from core 0.3.0-r4 and LuCI 0.3.0-r8. Includes the accepted C1–C4 fixe
 - Link validation in the geodatabase catalogue is tightened: unsupported generation and file links are rejected.
 - The build rejects unsupported paths with spaces and control characters up front, before touching the SDK.
 
-### Install and verification
+### Upgrade compatibility
 
-- Rebuilt APK and IPK packages for x86_64; APKs installed on the working server.
-- Before install, a private backup was saved; the current configuration, Xray, and network conditions were checked.
-- After install, the Xray, Zapret, and monitor services, LuCI tab loading, device pickers, and mobile width were verified.
-- Configuration, local servers, and HWID kept; bindings of selected and pinned servers verified.
+- Preserve configuration, local servers, device identity, selected servers and
+  pins during package upgrades.
+- Reject unsupported build paths before changing the SDK.
 
-No guarantee of overall multi-file atomicity on sudden power loss is added. Known HWID-restore and file-permission limitations are listed in the [fix acceptance](reports/blocker-closure/acceptance.md). Full UI-check history is in the [X1 report](reports/improvements-X/implementation.md).
+Saving detects an interrupted config/nodes update; recovery steps and durability
+limits are described in [Interrupted saves](docs/interrupted-save.md).

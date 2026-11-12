@@ -1,8 +1,8 @@
 # Product contract 0.3
 
-This contract was written before final testing. After the code freeze,
-tests verify the stated requirements; bugs found are recorded without
-changing the implementation. Totals and confirmation limits are in `reports/`.
+This document describes supported behavior, validation rules and known
+limitations. See [installation](install.md) for supported targets and
+[VM testing](openwrt-vm.md) for integration checks.
 
 ## Setup and compatibility
 
@@ -151,7 +151,7 @@ Test logs use synthetic sources; user subscriptions and HWID
 must not end up in reports.
 
 
-## Rule merging in core r4 / UI r8
+## Inactive rule settings
 
 `conditions` separately enables `domains`, `ips`, and `sets`. Without the object,
 all legacy fields are active. Disabled values persist across save/reload but
@@ -163,8 +163,3 @@ Stock DeviceSelects take OpenWrt Linux devices and serialize string names
 for LAN/WAN. Incompatible and inverted sets are marked in the catalogue; geosite attributes
 are checked against their own makeup. For an impossible action the UI explains
 the reason, and the backend keeps the final boundary check.
-
-Original check of the pinned version:
-`reports/runs/resume-0.3.0-r4-ui-r8/verification.md`. Later allowed
-blocker fixes and their confirmation limits:
-[fix acceptance](../reports/blocker-closure/acceptance.md).

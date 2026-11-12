@@ -1,0 +1,3 @@
+# Keep local guidance and private audit records out of source release archives.
+/AGENTS.md export-ignore
+/reports export-ignore

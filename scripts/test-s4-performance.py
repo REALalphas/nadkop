@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """S4 sequential, local-only performance runner. Standard library only.
 
-Compiles immutable production core files plus the opt-in S4 test, excluding all
-other agents' tests. Every scenario runs in a fresh process. Never talks to VMs,
+Compiles production core files plus the opt-in performance test. Every scenario runs in a fresh process. Never talks to VMs,
 changes system settings, invokes SDKs or uses actual subscriptions/credentials.
 """
 from __future__ import annotations
@@ -21,7 +20,20 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-from audit_common import MANIFEST, load_manifest, require_geo
+def require_geo(directory):
+    missing = [name for name in ('geosite.dat', 'geoip.dat')
+               if not (Path(directory) / name).is_file()]
+    if missing:
+        raise SystemExit('Missing geodata fixtures: ' + ', '.join(missing))
+
+
+def source_hashes():
+    files = list((ROOT / 'internal/core').glob('*.go')) + [Path(__file__).resolve()]
+    return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in files}
+
+
+SOURCE_HASHES = source_hashes()
 BASE = ROOT / 'build/agent-audit/S4'
 DEFAULT_CASES = [
     'scale-16', 'scale-256', 'scale-1024', 'scale-2048', 'scale-4096',
@@ -39,14 +51,14 @@ def atomic_json(path: Path, value):
 
 
 def verify(path: Path):
-    manifest = load_manifest()
+    manifest = {'files': SOURCE_HASHES}
     entries = []
     for name, expected in manifest['files'].items():
         p = ROOT / name
         actual = hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
         entries.append(dict(path=name, expected=expected, actual=actual, match=actual == expected))
     result = dict(at=dt.datetime.now(dt.timezone.utc).isoformat(),
-                  manifest_sha256=hashlib.sha256(MANIFEST.read_bytes()).hexdigest(),
+                  manifest_sha256=hashlib.sha256(json.dumps(SOURCE_HASHES, sort_keys=True).encode()).hexdigest(),
                   files=len(entries), matching=sum(x['match'] for x in entries),
                   mismatches=[x for x in entries if not x['match']], entries=entries)
     atomic_json(path, result)
@@ -236,7 +248,7 @@ def main():
     if not verify(out / 'frozen-before.json'):
         print('Protected source mismatch before S4; stopping.', flush=True)
         return 2
-    source = load_manifest()
+    source = {'files': SOURCE_HASHES}
     gofiles = sorted(p for p in source['files'] if p.startswith('internal/core/') and p.endswith('.go') and not p.endswith('_test.go'))
     gofiles.append('internal/core/s4_performance_test.go')
     fingerprint = hashlib.sha256(b''.join(p.encode()+b'\0'+(ROOT/p).read_bytes() for p in gofiles)).hexdigest()

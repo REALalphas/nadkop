@@ -524,7 +524,7 @@ try {
  await page.getByRole('dialog').getByRole('button',{name:/geosite:regex-demo/}).click();
  await page.getByRole('dialog').getByRole('button',{name:'Done',exact:true}).click();
  assert.equal(await rule(1).getByRole('button',{name:'Zapret',exact:true}).isDisabled(),true);
- assert.ok((await rule(1).getByRole('button',{name:'Zapret',exact:true}).getAttribute('title')).includes('Xray (VPN) only (VPN)'));
+ assert.ok((await rule(1).getByRole('button',{name:'Zapret',exact:true}).getAttribute('title')).includes('Xray (VPN) only.'));
  assert.equal(await rule(1).locator('.nk-action-reason').isVisible(),false,'unselected action shows a persistent warning');
  await rule(1).getByRole('button',{name:'Sets',exact:true}).click();
  await rule(1).getByRole('button',{name:'Zapret',exact:true}).click();

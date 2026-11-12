@@ -25,6 +25,10 @@ usage() {
 
 split_ver() {
   # split_ver 0.4.0-r2 -> "0.4.0 2"; split_ver 0.4.0 -> "0.4.0 1"
+  if ! printf '%s\n' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-r[0-9]+)?$'; then
+    echo "Bad version: $1 (want X.Y.Z or X.Y.Z-rN)" >&2
+    return 1
+  fi
   case "$1" in
     *-r[0-9]*)
       printf '%s %s\n' "${1%%-r*}" "${1##*-r}" ;;
@@ -54,20 +58,23 @@ if [ "${1:-}" = "--check" ]; then
   # word splitting is intentional to unpack "VERSION RELEASE".
   # shellcheck disable=SC2046
   set -- $(mk_get "$UI_MK"); ui="$1-r$2"
+  # shellcheck disable=SC2046
+  set -- $(mk_get "$NFQWS_MK"); nfqws="$1-r$2"
   fail=0
   [ "$(getter_get CORE)" = "$core" ] || { echo "CHECK FAIL: get-nadkop.sh CORE=$(getter_get CORE), want $core" >&2; fail=1; }
   [ "$(getter_get UI)" = "$ui" ] || { echo "CHECK FAIL: get-nadkop.sh UI=$(getter_get UI), want $ui" >&2; fail=1; }
-  grep -q "?v=$ui" "$OVERVIEW" || { echo "CHECK FAIL: overview.js cache-buster is not ?v=$ui" >&2; fail=1; }
-  if [ "$fail" -eq 0 ]; then echo "versions consistent: core=$core ui=$ui"; fi
+  [ "$(getter_get NFQWS)" = "$nfqws" ] || { echo "CHECK FAIL: get-nadkop.sh NFQWS=$(getter_get NFQWS), want $nfqws" >&2; fail=1; }
+  grep -qF "?v=$ui'" "$OVERVIEW" || { echo "CHECK FAIL: overview.js cache-buster is not ?v=$ui" >&2; fail=1; }
+  if [ "$fail" -eq 0 ]; then echo "versions consistent: core=$core ui=$ui nfqws=$nfqws"; fi
   exit "$fail"
 fi
 
 core_full=""; ui_full=""; nfqws_full=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --core) core_full="$2"; shift 2 ;;
-    --ui) ui_full="$2"; shift 2 ;;
-    --nfqws) nfqws_full="$2"; shift 2 ;;
+    --core) [ "$#" -ge 2 ] || usage; core_full="$2"; shift 2 ;;
+    --ui) [ "$#" -ge 2 ] || usage; ui_full="$2"; shift 2 ;;
+    --nfqws) [ "$#" -ge 2 ] || usage; nfqws_full="$2"; shift 2 ;;
     --help|-h) usage 0 ;;
     -*) usage ;;
     *) # positional unified version
@@ -75,15 +82,21 @@ while [ "$#" -gt 0 ]; do
       core_full="$1"; ui_full="$1"; shift ;;
   esac
 done
-[ -n "$core_full" ] || usage
+[ -n "$core_full" ] && [ -n "$ui_full" ] || usage
 
 # word splitting is intentional to unpack "VERSION RELEASE".
 
 # shellcheck disable=SC2046
-set -- $(split_ver "$core_full"); core_v="$1"; core_r="$2"
+core_parts="$(split_ver "$core_full")"
+set -- $core_parts; core_v="$1"; core_r="$2"
 # word splitting is intentional to unpack "VERSION RELEASE".
 # shellcheck disable=SC2046
-set -- $(split_ver "$ui_full"); ui_v="$1"; ui_r="$2"
+ui_parts="$(split_ver "$ui_full")"
+set -- $ui_parts; ui_v="$1"; ui_r="$2"
+if [ -n "$nfqws_full" ]; then
+  nfqws_parts="$(split_ver "$nfqws_full")"
+  set -- $nfqws_parts; nfqws_v="$1"; nfqws_r="$2"
+fi
 
 set_kv() {
   # set_kv FILE KEY VALUE — replace `KEY:=...` line (Makefile style).
@@ -104,9 +117,8 @@ set_kv "$UI_MK" PKG_RELEASE "$ui_r"
 if [ -n "$nfqws_full" ]; then
   # word splitting is intentional to unpack "VERSION RELEASE".
   # shellcheck disable=SC2046
-  set -- $(split_ver "$nfqws_full")
-  set_kv "$NFQWS_MK" PKG_VERSION "$1"
-  set_kv "$NFQWS_MK" PKG_RELEASE "$2"
+  set_kv "$NFQWS_MK" PKG_VERSION "$nfqws_v"
+  set_kv "$NFQWS_MK" PKG_RELEASE "$nfqws_r"
 fi
 # word splitting is intentional to unpack "VERSION RELEASE".
 # shellcheck disable=SC2046
@@ -139,7 +151,7 @@ PY
 
 # CHANGELOG skeleton (date-led headers, as in this repo).
 today="$(date +%F)"
-if ! grep -qF -- "$core_v-r$core_r" "$LOG"; then
+if ! grep '^## ' "$LOG" | grep -qF -- "LuCI $ui_v-r$ui_r"; then
   python3 - "$LOG" "$today" "$core_v-r$core_r" "$ui_v-r$ui_r" <<'PY'
 import sys
 path, today, core, ui = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]

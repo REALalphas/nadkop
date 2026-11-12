@@ -40,8 +40,8 @@ while no save is in progress. Without a marker, its old format does not promise
 automatic recognition of every mix; the existing refs/compile checks
 remain required. Do not restore a partial backup as a complete pair.
 
-Check: `python3 scripts/test-x2-save-faults.py` uses only its own
-files under `build/improvements-X/x2-implementation/save-faults`. 12 scenarios
+Check: `python3 scripts/test-x2-save-faults.py` uses only temporary test
+files under the ignored `build/` directory. Its scenarios
 cover SIGKILL before each of the three renames, kill after config rename, six
 fsync EIOs, config-rename failure, and baseline. This is in-process syscall injection,
 not a flash or router-power-loss test.

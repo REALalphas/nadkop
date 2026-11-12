@@ -133,31 +133,6 @@ interface. The image carries no real subscriptions or VPN credentials; for proxy
 checks the test raises a temporary local upstream. Do not run
 smoke scripts while editing LuCI.
 
-## Current check example
-
-Installing the core `0.3.0-r6` + LuCI `0.3.0-r11` bundle (package SHA256
-checked against the local manifest; earlier revisions see `CHANGELOG.md`):
-
-- sources matched the build manifest, 0 differences; `go vet ./...`, build, and `nadkop validate` passed locally;
-- the candidate was checked in isolation: `apk extract`, `generate` with copies of
-  `config.json`, `servers.json`, and geodata produced a 91-outbound object,
-  Xray answered `Configuration OK`;
-- after install, SHA256 of `config.json`, `nodes.json`, and `hwid` match
-  the pre-upgrade state; the server catalogue updated normally, rule
-  links resolve; `config.json`, `nodes.json`, `hwid`, `servers.json`
-  are 0600 and listed in conffiles / `sysupgrade -l` (keep.d);
-- Xray, nfqws, and monitor run under procd, NFQUEUE 200 and the
-  `inet nadkop` table in place, autostart on; LuCI statics serve
-  HTTP 200, the page itself without a session correctly returns 403;
-- the UI was checked for focus-preserving polling: background polling every 2 s
-  does not set `disabled` on inputs, the diagnostics list redraws
-  only on state-signature change.
-
-This check confirms install, node loading, and config
-correctness, but not every external server's reachability, nor
-bypass effectiveness. Transparent LAN interception and zapret effectiveness
-on blocked resources are not covered by this test.
-
 ## Typical pitfalls
 
 - **`ui.lock` race.** The installer runs `nadkop apply` but may
@@ -172,10 +147,10 @@ on blocked resources are not covered by this test.
   a second SOCKS/proxy on the same port breaks smoke tests
   (direct/proxy/block) and diagnostics. Keep the port free or
   split instances across ports.
-- **`/var` is a symlink to `/tmp`.** On OpenWrt `/var/run/nadkop` resolves
-  to `/tmp/run/nadkop`; if the monitor compares the post-`EvalSymlinks` path
-  against the literal `/var/run/nadkop`, `monitor-status.json` may never be
-  created even though the monitor itself runs. Affects diagnostics display only.
+- **Monitor status on older builds.** OpenWrt resolves `/var/run/nadkop`
+  through `/var -> /tmp`. Current sources write `monitor-status.json` beside
+  the resolved manifest and have a local regression test for this path.
+  Older packages may still show no monitor status; rebuild before checking.
 - **Upgrades keep state.** On package upgrades the SHA256 of
   `config.json`, `nodes.json`, `hwid` must persist, a disabled
   service must stay disabled; the new sample config lands next to it

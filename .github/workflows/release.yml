@@ -12,6 +12,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
 env:
   REPO: REALalphas/nadkop
 
@@ -23,15 +27,55 @@ jobs:
       base_url: ${{ steps.v.outputs.base_url }}
     steps:
       - id: v
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RAW="${{ inputs.version }}"
+          set -eu
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            RAW="$INPUT_VERSION"
           else
             RAW="${GITHUB_REF_NAME}"
           fi
           VER="${RAW#v}"
+          if ! printf '%s\n' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-r[0-9]+$'; then
+            echo '::error::Expected a release version X.Y.Z-rN.'
+            exit 1
+          fi
           echo "ver=$VER" >> "$GITHUB_OUTPUT"
           echo "base_url=https://github.com/${{ env.REPO }}/releases/download/v${VER}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ steps.v.outputs.ver }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Verify release candidate
+        env:
+          VER: ${{ steps.v.outputs.ver }}
+        run: |
+          set -eu
+          ui="$(awk -F':=' '/^PKG_VERSION:=/{v=$2} /^PKG_RELEASE:=/{r=$2} END{printf "%s-r%s", v, r}' openwrt/luci-app-nadkop/Makefile)"
+          test "$VER" = "$ui" || { echo '::error::Release tag must match the LuCI package version.'; exit 1; }
+          bash scripts/bump-version.sh --check
+          go vet ./...
+          go test ./...
+          go build -o build/nadkop ./cmd/nadkop
+          ./build/nadkop validate -config examples/config.json
+          test -z "$(gofmt -l cmd internal)"
+          python3 - "$VER" <<'PY'
+          import re, sys
+          ver = sys.argv[1]
+          lines = open('CHANGELOG.md', encoding='utf-8').read().splitlines()
+          heading = re.compile(r'^## .*LuCI ' + re.escape(ver) + r'(?:\s|$)')
+          start = next((i for i, line in enumerate(lines) if heading.search(line)), None)
+          if start is None:
+              sys.exit('Missing release changelog section')
+          end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith('## ')), len(lines))
+          if 'TODO: describe' in '\n'.join(lines[start:end]):
+              sys.exit('Unfinished release changelog section')
+          PY
+          python3 scripts/test-release.py
 
   build-go:
     needs: version
@@ -134,14 +178,18 @@ jobs:
               [ -e "$p" ] || continue
               case "$p" in
                 *luci-app-nadkop*.apk) cp "$p" release/ ;;
-                *luci-app-nadkop*.ipk) cp "$p" release/ ;;
                 *.apk) cp "$p" "release/$(basename "$p" .apk)-${arch}.apk" ;;
                 # Use the machine arch in asset names, as get-nadkop.sh does.
                 # The package's internal OpenWrt ABI arch stays unchanged.
                 *.ipk)
                   name="$(basename "$p" .ipk)"
                   package="${name%%_*}"; version_arch="${name#*_}"
-                  cp "$p" "release/${package}_${version_arch%%_*}_${arch}.ipk" ;;
+                  version="${version_arch%%_*}"
+                  # opkg SDKs use -N; APK and our release pins use -rN.
+                  version="$(printf '%s\n' "$version" | sed -E 's/-([0-9]+)$/-r\1/')"
+                  package_arch="$arch"
+                  [ "$package" != luci-app-nadkop ] || package_arch=all
+                  cp "$p" "release/${package}_${version}_${package_arch}.ipk" ;;
               esac
             done
           done
@@ -176,13 +224,15 @@ jobs:
           ver = sys.argv[1]
           text = open('CHANGELOG.md', encoding='utf-8').read()
           lines = text.splitlines()
-          start = next((i for i, l in enumerate(lines) if ver in l), None)
+          heading = re.compile(r'^## .*LuCI ' + re.escape(ver) + r'(?:\s|$)')
+          start = next((i for i, l in enumerate(lines) if heading.search(l)), None)
           if start is None:
               print(f'Nadkop {ver}. See CHANGELOG.md for details.')
           else:
               end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith('## ')), len(lines))
               print('\n'.join(lines[start:end]).strip())
           PY
+          # shellcheck disable=SC2016
           printf '\n\n---\nFull history: CHANGELOG.md. One-line install from this release:\n```sh\nuclient-fetch -O /tmp/get-nadkop.sh %s/get-nadkop.sh && sh /tmp/get-nadkop.sh %s\n```\n' \
             "${{ needs.version.outputs.base_url }}" "${{ needs.version.outputs.base_url }}" >> release/notes.md
           cat release/notes.md
@@ -191,7 +241,7 @@ jobs:
           VER: ${{ needs.version.outputs.ver }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v$VER" --title "v$VER" --notes-file release/notes.md \
+          gh release create "v$VER" --verify-tag --title "v$VER" --notes-file release/notes.md \
             release/nadkop-linux-x86_64 release/nadkop-linux-aarch64 \
             release/*.apk release/*.ipk release/sha256sums \
             release/get-nadkop.sh release/install-openwrt.sh

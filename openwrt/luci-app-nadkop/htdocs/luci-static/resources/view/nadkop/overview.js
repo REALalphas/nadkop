@@ -870,7 +870,7 @@ return view.extend({
      return E('button',{type:'button','class':'cbi-button cbi-button-neutral nk-geo-result','aria-pressed':String(selected),disabled:unsupported&&!selected?'':null,
       title:item.unsupported|| (unsupported?'Set is only supported by Xray (VPN)':null),click:function(){
        rule.sets=rule.sets||[];var i=rule.sets.indexOf(item.id);if(i>=0)rule.sets.splice(i,1);else rule.sets.push(item.id);changed();rules();draw();
-      }},[E('span',{},[selected?'✓ ':'',geoDisplay(item)]),E('small',{},[item.count + (item.unsupported?' · unavailable':unsupported?' · Xray (VPN) only (VPN)':'')])]);
+      }},[E('span',{},[selected?'✓ ':'',geoDisplay(item)]),E('small',{},[item.count + (item.unsupported?' · unavailable':unsupported?' · Xray (VPN) only':'')])]);
     }));
     if(items.length>limit)results.append(button('More',function(){limit+=100;draw();}));
    }
@@ -1193,7 +1193,7 @@ return view.extend({
    tabbar.appendChild(li);
   });
   var root = E('div', { 'class': 'cbi-map nk-app' }, [
-   E('link', { rel: 'stylesheet', href: L.resource('nadkop/picker.css') + '?v=0.3.0-r12' }),
+   E('link', { rel: 'stylesheet', href: L.resource('nadkop/picker.css') + '?v=0.3.0-r13' }),
    E('div', { 'class': 'nk-heading' }, [E('h2', {}, ['Nadkop']), statusBox]),
    tabbar, panes,
    E('div', { 'class': 'cbi-page-actions' }, [dirty, resetButton, button('Save', function() { return save(false); }),

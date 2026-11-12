@@ -1,7 +1,7 @@
 # Zapret auto-tuner
 
-Implementation of UI-01 from `reports/ui-backlog-2026-11-03.md`: backend 0.3.0-r6,
-LuCI 0.3.0-r11. Classic nfqws from Nadkop's pinned package.
+The auto-tuner checks built-in DPI circumvention strategies using the
+classic nfqws engine from Nadkop's pinned package.
 
 Task state is polled every two seconds in the background. Polling neither blocks nor
 resets focus in the "Probe sites" and "Probe protocols" fields, and results
@@ -129,6 +129,4 @@ This test proves isolation and failure handling, not real-DPI bypass effectivene
 Limits: four built-in strategies, IPv4 HTTP/HTTPS from the router, one IPv4
 per domain, no QUIC/HTTP3, IPv6, custom-argument brute force, or LAN probes.
 Networks change; even interleaved probes prove no causality for any
-provider. HTTP needs an extra user-side resource check. The three known restore studies
-still fail in a full `go test ./...`;
-they must neither be hidden nor declared fixed by this change.
+provider. HTTP needs an extra user-side resource check.

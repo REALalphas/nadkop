@@ -37,11 +37,9 @@ known_hosts
 .env
 .env.*
 
-# Machine-generated reports (keep curated *.md)
-reports/logs/
-reports/runs/
-reports/*.json
-reports/**/*.json
+# Local agent guidance and internal audit records
+/AGENTS.md
+/reports/
 
 # Editors
 .vscode/

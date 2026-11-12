@@ -53,10 +53,11 @@ jobs:
           echo "exists=false" >> "$GITHUB_OUTPUT"
           # bump-version.sh leaves a TODO skeleton: refuse to release it.
           python3 - "$ui" <<'PY'
-          import sys
+          import re, sys
           ui = sys.argv[1]
           lines = open('CHANGELOG.md', encoding='utf-8').read().splitlines()
-          start = next((i for i, l in enumerate(lines) if ui in l), None)
+          heading = re.compile(r'^## .*LuCI ' + re.escape(ui) + r'(?:\s|$)')
+          start = next((i for i, l in enumerate(lines) if heading.search(l)), None)
           if start is None:
               sys.exit(f'CHANGELOG has no section mentioning {ui}; fill it, then push again.')
           end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith('## ')), len(lines))

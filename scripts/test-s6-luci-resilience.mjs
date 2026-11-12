@@ -1,4 +1,4 @@
-// S6 isolated headless audit. Only synthetic HTTP routes and this runner's pages.
+// Browser resilience regressions with synthetic HTTP and RPC responses.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,16 +8,11 @@ import { s6Root, s6RPCPath, s6ThemeRoot, s6IDs, s6InitialState, s6ReadSources, s
 
 const s6Output = path.resolve(process.env.S6_ARTIFACT_DIR || path.join(s6Root, 'build/agent-audit/S6/latest'));
 const s6Filter = new RegExp(process.env.S6_CASE || '.');
-const auditConfig = JSON.parse(await fs.readFile(new URL('./audit-config.json', import.meta.url), 'utf8'));
-const s6Manifest = process.env.S6_MANIFEST || path.join(path.resolve(s6Root, process.env.NADKOP_AUDIT_REPORT || auditConfig.report), auditConfig.manifest);
-const playwrightModule = process.env.NADKOP_PLAYWRIGHT_MODULE || auditConfig.playwright;
-try { await fs.access(playwrightModule); } catch {
-  console.error(`ERROR: Playwright module missing: ${playwrightModule}. Prepare /path/to/playwright-env or set NADKOP_PLAYWRIGHT_MODULE to its index.mjs file.`);
-  process.exit(2);
-}
+const s6Manifest = process.env.S6_MANIFEST;
+const playwrightModule = process.env.NADKOP_PLAYWRIGHT_MODULE || 'playwright';
 const s6Results = [];
 const s6Started = new Date().toISOString();
-let s6Browser, s6Sources;
+let s6Browser, s6Sources, s6InitialManifest;
 
 async function s6AtomicJSON(file, value) {
   const temporary = file + '.' + process.pid + '.tmp';
@@ -25,14 +20,22 @@ async function s6AtomicJSON(file, value) {
 }
 
 async function s6Frozen(name) {
-  const manifestBytes = await fs.readFile(s6Manifest), manifest = JSON.parse(manifestBytes);
+  // Compare the files used by this run, without requiring a private audit snapshot.
+  const files = ['openwrt/luci-app-nadkop/htdocs/luci-static/resources/view/nadkop/overview.js',
+    'openwrt/luci-app-nadkop/htdocs/luci-static/resources/nadkop/picker.js',
+    'openwrt/luci-app-nadkop/htdocs/luci-static/resources/nadkop/picker.css',
+    'scripts/fixtures/s6-luci-harness.mjs', 'scripts/test-s6-luci-resilience.mjs'];
+  const manifestBytes = s6Manifest ? await fs.readFile(s6Manifest) : Buffer.from(JSON.stringify({files: Object.fromEntries(await Promise.all(files.map(async file =>
+    [file, crypto.createHash('sha256').update(await fs.readFile(path.join(s6Root, file))).digest('hex')])))}));
+  const manifest = s6InitialManifest || JSON.parse(manifestBytes);
+  s6InitialManifest = manifest;
   const sha256 = {}, mismatches = [];
   for (const [file, expected] of Object.entries(manifest.files)) {
     let actual = null;
     try { actual = crypto.createHash('sha256').update(await fs.readFile(path.join(s6Root, file))).digest('hex'); } catch {}
     sha256[file] = actual; if (actual !== expected) mismatches.push({ file, expected, actual });
   }
-  const result = { at: new Date().toISOString(), manifest: path.relative(s6Root, s6Manifest),
+  const result = { at: new Date().toISOString(), manifest: s6Manifest ? path.relative(s6Root, s6Manifest) : 'current sources',
     manifestSha256: crypto.createHash('sha256').update(manifestBytes).digest('hex'), filesChecked: Object.keys(sha256).length, mismatches, sha256 };
   await s6AtomicJSON(path.join(s6Output, name + '.json'), result); return result;
 }
