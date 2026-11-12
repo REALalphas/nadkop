@@ -55,7 +55,9 @@ jobs:
 
   build-openwrt:
     needs: version
-    runs-on: ubuntu-latest
+    # The 24.10 SDK requires GNU install; Ubuntu 26.04 ships a different
+    # implementation. Keep the SDK host stable when ubuntu-latest moves.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: true
       matrix:
