@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
 import tempfile
@@ -31,7 +32,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.work = Path(self.temp.name)
         for name in ('openwrt', 'scripts/get-nadkop.sh', 'scripts/install-openwrt.sh',
-                     'scripts/bump-version.sh', 'CHANGELOG.md', '.gitattributes'):
+                     'scripts/bump-version.sh', 'scripts/build-openwrt.sh',
+                     'scripts/openwrt-cache-key.py', '.github/workflows/openwrt.yml',
+                     'CHANGELOG.md', '.gitattributes'):
             src, dst = ROOT / name, self.work / name
             if src.is_dir():
                 shutil.copytree(src, dst)
@@ -190,6 +193,158 @@ class ReleaseWorkflowTest(unittest.TestCase):
                               RELEASE_PAT='', TAG='vtest')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('RELEASE_PAT secret is not set', result.stdout)
+
+    def prepare_sdk_feeds(self, scenario):
+        bindir = self.work / 'fakebin'
+        bindir.mkdir()
+        make = bindir / 'make'
+        make.write_text('#!/bin/sh\n'
+                        'echo "make $*" >> "$SDK_CALLS"\n'
+                        '[ "$SDK_SCENARIO" != prereq-failure ]\n')
+        make.chmod(0o755)
+        feeds = self.work / 'scripts/feeds'
+        feeds.write_text('#!/bin/sh\n'
+                         'echo "feeds $*" >> "$SDK_CALLS"\n'
+                         'if [ "$1" = update ]; then\n'
+                         '  mkdir -p feeds\n'
+                         '  for feed in "$2" "$3" "$4"; do\n'
+                         '    printf "Package: fixture\\n" > "feeds/$feed.index"\n'
+                         '  done\n'
+                         '  case "$SDK_SCENARIO" in\n'
+                         '    missing-index) rm feeds/base.index ;;\n'
+                         '    empty-index) : > feeds/luci.index ;;\n'
+                         '    missing-libnfnetlink) ;;\n'
+                         '    *) printf "Package: libnfnetlink\\n" >> feeds/base.index ;;\n'
+                         '  esac\n'
+                         'fi\n')
+        feeds.chmod(0o755)
+        calls = self.work / 'sdk-calls'
+        result = self.execute(run_block('openwrt.yml', 'Prepare feeds (pinned upstream + golang)'),
+                              PATH=str(bindir) + os.pathsep + os.environ['PATH'],
+                              SDK_SCENARIO=scenario, SDK_CALLS=str(calls))
+        return result, calls.read_text().splitlines()
+
+    def test_sdk_prerequisite_failure_stops_before_feeds(self):
+        result, calls = self.prepare_sdk_feeds('prereq-failure')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(calls, ['make prepare-mk'])
+
+    def test_sdk_feed_indexing_failure_stops_before_install(self):
+        result, calls = self.prepare_sdk_feeds('missing-index')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('base has no package index', result.stdout)
+        self.assertFalse(any('install' in call for call in calls))
+
+    def test_sdk_empty_feed_index_stops_before_install(self):
+        result, calls = self.prepare_sdk_feeds('empty-index')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('luci has no package index', result.stdout)
+        self.assertFalse(any('install' in call for call in calls))
+
+    def test_sdk_missing_target_libnfnetlink_stops_before_install(self):
+        result, calls = self.prepare_sdk_feeds('missing-libnfnetlink')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('missing target libnfnetlink', result.stdout)
+        self.assertFalse(any('install' in call for call in calls))
+
+    def test_sdk_pinned_feeds_are_loaded_before_install(self):
+        result, calls = self.prepare_sdk_feeds('success')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls, ['make prepare-mk', 'feeds update base packages luci',
+                                 'feeds install -p packages golang'])
+
+    def sdk_key(self, url='https://example.invalid/sdk-x86.tar.zst', host='ubuntu24-x86_64'):
+        key = runpy.run_path(str(ROOT / 'scripts/openwrt-cache-key.py'))['cache_key']
+        return key(url, host, root=self.work)
+
+    def test_sdk_cache_survives_source_and_version_changes(self):
+        before = self.sdk_key()
+        recipe = self.work / 'openwrt/luci-app-nadkop/Makefile'
+        recipe.write_text(re.sub(r'PKG_RELEASE:=.*', 'PKG_RELEASE:=999', recipe.read_text()))
+        (self.work / 'openwrt/nadkop/files/changed-source').write_text('new source')
+        self.assertEqual(self.sdk_key(), before)
+
+    def test_sdk_cache_separates_sdk_and_host(self):
+        before = self.sdk_key()
+        self.assertNotEqual(self.sdk_key(url='https://example.invalid/sdk-arm.tar.zst'), before)
+        self.assertNotEqual(self.sdk_key(host='ubuntu26-x86_64'), before)
+
+    def test_sdk_cache_invalidates_changed_dependencies(self):
+        before = self.sdk_key()
+        recipe = self.work / 'openwrt/nadkop/Makefile'
+        recipe.write_text(recipe.read_text().replace('+xray-core', '+new-library +xray-core'))
+        self.assertNotEqual(self.sdk_key(), before)
+
+    def test_sdk_cache_invalidates_build_policy_changes(self):
+        before = self.sdk_key()
+        script = self.work / 'scripts/build-openwrt.sh'
+        script.write_text(script.read_text() + '\n# Changed build policy\n')
+        self.assertNotEqual(self.sdk_key(), before)
+
+    def test_sdk_cache_invalidates_other_recipe_changes(self):
+        before = self.sdk_key()
+        recipe = self.work / 'openwrt/nadkop/Makefile'
+        recipe.write_text(recipe.read_text() + '\nPKG_BUILD_FLAGS+=new-setting\n')
+        self.assertNotEqual(self.sdk_key(), before)
+
+    def test_sdk_cache_can_use_policy_helpers_with_older_source(self):
+        key = runpy.run_path(str(ROOT / 'scripts/openwrt-cache-key.py'))['cache_key']
+        before = key('sdk', 'ubuntu24', root=self.work, policy_root=ROOT)
+        (self.work / 'scripts/openwrt-cache-key.py').unlink()
+        (self.work / '.github/workflows/openwrt.yml').unlink()
+        self.assertEqual(key('sdk', 'ubuntu24', root=self.work, policy_root=ROOT), before)
+
+    def test_sdk_prepared_build_requires_exact_cache_hit(self):
+        builder = self.work / '.nadkop-build-tools/scripts/build-openwrt.sh'
+        builder.parent.mkdir(parents=True)
+        builder.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$GITHUB_WORKSPACE/build-args"\n')
+        for hit in ('true', 'false', ''):
+            result = self.execute(run_block('openwrt.yml', 'Build nadkop packages'),
+                                  GITHUB_WORKSPACE=str(self.work), COMBO='apk-x86_64',
+                                  SDK_CACHE_HIT=hit)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            args = (self.work / 'build-args').read_text().splitlines()
+            self.assertEqual(args[:2], ['/tmp/sdk', str(self.work / 'dist/apk-x86_64')])
+            self.assertEqual(args[2:], ['--prepared'] if hit == 'true' else [])
+
+    def publish_candidate(self, moved=False, annotated=True):
+        result = self.execute('git init -q && git config user.name Test && '
+                              'git config user.email test@example.invalid && '
+                              'git -c commit.gpgsign=false commit --allow-empty -qm candidate')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        sha = self.execute('git rev-parse HEAD').stdout.strip()
+        ver = self.version('luci-app-nadkop')
+        tag_args = '-a -m release' if annotated else ''
+        result = self.execute(f'git tag {tag_args} v{ver} && git remote add origin .')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        if moved:
+            result = self.execute('git -c commit.gpgsign=false commit --allow-empty -qm moved && '
+                                  f'git tag -f v{ver}')
+            self.assertEqual(result.returncode, 0, result.stderr)
+        bindir = self.work / 'fakebin'
+        bindir.mkdir()
+        gh = bindir / 'gh'
+        gh.write_text('#!/bin/sh\nprintf published > published\n')
+        gh.chmod(0o755)
+        return self.execute(run_block('release.yml', 'Create GitHub Release'),
+                            VER=ver, RELEASE_SHA=sha,
+                            PATH=str(bindir) + os.pathsep + os.environ['PATH'])
+
+    def test_publish_matching_annotated_tag(self):
+        result = self.publish_candidate()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.work / 'published').exists())
+
+    def test_publish_matching_lightweight_tag(self):
+        result = self.publish_candidate(annotated=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.work / 'published').exists())
+
+    def test_moved_tag_blocks_publication(self):
+        result = self.publish_candidate(moved=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Release tag moved', result.stdout)
+        self.assertFalse((self.work / 'published').exists())
 
     def test_release_layout_and_installer(self):
         ver = self.version('luci-app-nadkop')

@@ -1,4 +1,5 @@
 name: Release
+run-name: Release · ${{ inputs.version || github.ref_name }}
 
 on:
   push:
@@ -13,7 +14,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ inputs.version || github.ref_name }}
+  # Manual versions (with or without v) share the tag push's lock.
+  group: release-${{ (startsWith(inputs.version, 'v') && inputs.version) || (inputs.version && format('v{0}', inputs.version)) || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -21,10 +23,11 @@ env:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       ver: ${{ steps.v.outputs.ver }}
       base_url: ${{ steps.v.outputs.base_url }}
+      sha: ${{ steps.source.outputs.sha }}
     steps:
       - id: v
         env:
@@ -44,12 +47,18 @@ jobs:
           fi
           echo "ver=$VER" >> "$GITHUB_OUTPUT"
           echo "base_url=https://github.com/${{ env.REPO }}/releases/download/v${VER}" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          ref: v${{ steps.v.outputs.ver }}
-      - uses: actions/setup-go@v5
+          # A queued tag run must use the triggering commit if the tag moves.
+          ref: ${{ github.event_name == 'push' && github.sha || format('v{0}', steps.v.outputs.ver) }}
+      - name: Pin release source
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.23'
+          # No external Go dependencies, so there is no go.sum to hash.
+          cache: false
       - name: Verify release candidate
         env:
           VER: ${{ steps.v.outputs.ver }}
@@ -79,86 +88,41 @@ jobs:
 
   build-go:
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          ref: v${{ needs.version.outputs.ver }}
-      - uses: actions/setup-go@v5
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.23'
+          # No external Go dependencies, so there is no go.sum to hash.
+          cache: false
       - run: bash scripts/bump-version.sh --check
       - run: |
           mkdir -p dist/host
           GOOS=linux GOARCH=amd64 go build -o dist/host/nadkop-linux-x86_64 ./cmd/nadkop
           GOOS=linux GOARCH=arm64 go build -o dist/host/nadkop-linux-aarch64 ./cmd/nadkop
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: host-${{ needs.version.outputs.ver }}
           path: dist/host/
 
   build-openwrt:
     needs: version
-    # The 24.10 SDK requires GNU install; Ubuntu 26.04 ships a different
-    # implementation. Keep the SDK host stable when ubuntu-latest moves.
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          # NOTE: refresh point-release + SDK filenames when OpenWrt ships updates.
-          - combo: apk-x86_64
-            pkgtype: apk
-            arch: x86_64
-            sdk_url: https://downloads.openwrt.org/releases/25.12.0/targets/x86/64/openwrt-sdk-25.12.0-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst
-          - combo: apk-aarch64
-            pkgtype: apk
-            arch: aarch64
-            sdk_url: https://downloads.openwrt.org/releases/25.12.0/targets/armsr/armv8/openwrt-sdk-25.12.0-armsr-armv8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
-          - combo: ipk-x86_64
-            pkgtype: ipk
-            arch: x86_64
-            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/x86/64/openwrt-sdk-24.10.2-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-          - combo: ipk-aarch64
-            pkgtype: ipk
-            arch: aarch64
-            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/armsr/armv8/openwrt-sdk-24.10.2-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: v${{ needs.version.outputs.ver }}
-      - run: bash scripts/bump-version.sh --check
-      - name: OpenWrt SDK prerequisites
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential clang flex bison gawk gettext \
-            libncurses-dev libssl-dev python3-setuptools rsync unzip zlib1g-dev \
-            file wget curl zstd git
-      - name: Fetch SDK
-        run: |
-          mkdir -p /tmp/sdk
-          curl -fSL "${{ matrix.sdk_url }}" -o /tmp/sdk.tar.zst
-          tar --zstd -xf /tmp/sdk.tar.zst -C /tmp/sdk --strip-components=1
-      - name: Prepare feeds (pinned upstream + golang)
-        working-directory: /tmp/sdk
-        run: |
-          ./scripts/feeds update base packages luci
-          ./scripts/feeds install -p packages golang
-      - name: Build nadkop packages
-        run: bash "$GITHUB_WORKSPACE/scripts/build-openwrt.sh" /tmp/sdk "$GITHUB_WORKSPACE/dist/${{ matrix.combo }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: owrt-${{ matrix.combo }}-${{ needs.version.outputs.ver }}
-          path: dist/${{ matrix.combo }}/
+    uses: ./.github/workflows/openwrt.yml
+    with:
+      source_ref: ${{ needs.version.outputs.sha }}
+      artifact_suffix: ${{ needs.version.outputs.ver }}
 
   publish:
     needs: [version, build-go, build-openwrt]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          ref: v${{ needs.version.outputs.ver }}
-      - uses: actions/download-artifact@v4
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts/
       - name: Assemble release layout
@@ -239,8 +203,15 @@ jobs:
       - name: Create GitHub Release
         env:
           VER: ${{ needs.version.outputs.ver }}
+          RELEASE_SHA: ${{ needs.version.outputs.sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -eu
+          git fetch --no-tags origin "refs/tags/v$VER"
+          test "$(git rev-parse 'FETCH_HEAD^{commit}')" = "$RELEASE_SHA" || {
+            echo '::error::Release tag moved during the build. Refusing to publish stale artifacts.'
+            exit 1
+          }
           gh release create "v$VER" --verify-tag --title "v$VER" --notes-file release/notes.md \
             release/nadkop-linux-x86_64 release/nadkop-linux-aarch64 \
             release/*.apk release/*.ipk release/sha256sums \

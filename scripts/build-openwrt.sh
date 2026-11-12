@@ -7,12 +7,13 @@ usage() {
 	exit 1
 }
 [ "$#" -ge 1 ] && [ "$#" -le 3 ] || usage
+project_input="${NADKOP_SOURCE_ROOT:-$(dirname -- "$0")/..}"
 # OpenWrt feed parsing and package recipes do not support these paths. Check
 # both supplied and physical paths before creating output or changing the SDK.
-python3 - "$0" "$1" <<'PY'
+python3 - "$project_input" "$1" <<'PY'
 from pathlib import Path
 import sys, unicodedata
-paths = [('project', Path(sys.argv[1]).absolute().parent.parent),
+paths = [('project', Path(sys.argv[1]).absolute()),
          ('SDK', Path(sys.argv[2]).absolute())]
 for label, path in paths:
     for candidate in (path, path.resolve()):
@@ -20,7 +21,7 @@ for label, path in paths:
                for c in str(candidate)):
             sys.exit(f'Unsupported {label} path: whitespace and control characters are not supported by the OpenWrt build. Use a plain path.')
 PY
-project="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)"
+project="$(CDPATH='' cd -- "$project_input" && pwd -P)"
 sdk="$(CDPATH='' cd -- "$1" && pwd -P)"
 shift
 out="$project/build/packages"
@@ -58,6 +59,13 @@ lines = [line for line in p.read_text().splitlines()
 p.write_text('\n'.join(lines + [k + '=m' for k in keys]) + '\n')
 PY
 make defconfig
+# A cached SDK contains old project build stamps. Always re-read this checkout's
+# sources, even when a version was not bumped. Leave upstream dependencies built.
+if [ "${NADKOP_CLEAN_PACKAGES:-0}" = 1 ]; then
+	for package in nadkop-nfqws nadkop luci-app-nadkop; do
+		make "package/$package/clean" V=s
+	done
+fi
 if [ "$prepared" = 1 ]; then
 	# Rebuild package contents without revisiting already built dependencies.
 	for package in nadkop-nfqws nadkop luci-app-nadkop; do

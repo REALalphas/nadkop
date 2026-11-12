@@ -107,3 +107,15 @@ Needs the OpenWrt SDK of the same release and target as the router
 ```
 
 Details: `docs/openwrt-vm.md`.
+
+GitHub Actions reuses a prepared SDK (including the Go compiler and upstream
+dependencies) for each release and architecture. The **SDK cache** workflow
+warms caches on `main` after build-policy or package recipe changes, every
+Monday, or via **Run workflow**. Release tags can restore these default-branch
+caches; tag-only caches would not be available to the next release tag.
+
+The first build after a cache miss still compiles the full SDK dependencies.
+Later builds clean and rebuild all three Nadkop packages with `--prepared`,
+reusing the already built dependencies. SDK, host OS, package recipe (apart from
+versions), or build-policy changes select a new cache; version bumps and
+application source edits reuse the existing one.

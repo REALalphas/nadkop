@@ -1,0 +1,137 @@
+name: SDK cache
+run-name: SDK cache · ${{ github.ref_name }}
+
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        required: true
+      artifact_suffix:
+        type: string
+        default: ''
+  # Populate caches on the default branch so every release tag can restore them.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/openwrt.yml'
+      - 'scripts/build-openwrt.sh'
+      - 'scripts/openwrt-cache-key.py'
+      - 'openwrt/*/Makefile'
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keep this distinct from the calling release workflow's concurrency group.
+  group: sdk-${{ github.ref }}-${{ inputs.artifact_suffix || 'warm' }}
+  cancel-in-progress: false
+
+jobs:
+  packages:
+    name: ${{ matrix.combo }}
+    # The 24.10 SDK requires GNU install; Ubuntu 26.04 ships a different
+    # implementation. Keep the SDK host stable when ubuntu-latest moves.
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # NOTE: refresh point-release + SDK filenames when OpenWrt ships updates.
+          - combo: apk-x86_64
+            pkgtype: apk
+            arch: x86_64
+            sdk_url: https://downloads.openwrt.org/releases/25.12.0/targets/x86/64/openwrt-sdk-25.12.0-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          - combo: apk-aarch64
+            pkgtype: apk
+            arch: aarch64
+            sdk_url: https://downloads.openwrt.org/releases/25.12.0/targets/armsr/armv8/openwrt-sdk-25.12.0-armsr-armv8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          - combo: ipk-x86_64
+            pkgtype: ipk
+            arch: x86_64
+            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/x86/64/openwrt-sdk-24.10.2-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+          - combo: ipk-aarch64
+            pkgtype: ipk
+            arch: aarch64
+            sdk_url: https://downloads.openwrt.org/releases/24.10.2/targets/armsr/armv8/openwrt-sdk-24.10.2-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+      # Manual rebuilds may target older tags without these build helpers.
+      # Keep build policy from the workflow commit, sources from source_ref.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .nadkop-build-tools
+          persist-credentials: false
+      - run: bash scripts/bump-version.sh --check
+      - name: OpenWrt SDK prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential clang flex bison gawk gettext \
+            libncurses-dev libssl-dev python3-setuptools rsync unzip zlib1g-dev \
+            file wget curl zstd git
+      - name: SDK cache identity
+        id: key
+        env:
+          SDK_URL: ${{ matrix.sdk_url }}
+          NADKOP_SOURCE_ROOT: ${{ github.workspace }}
+        run: echo "key=$(python3 .nadkop-build-tools/scripts/openwrt-cache-key.py "$SDK_URL")" >> "$GITHUB_OUTPUT"
+      - name: Restore SDK and built dependencies
+        id: sdk-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: /tmp/sdk
+          key: ${{ steps.key.outputs.key }}
+      - name: Fetch SDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/sdk
+          curl -fSL "${{ matrix.sdk_url }}" -o /tmp/sdk.tar.zst
+          tar --zstd -xf /tmp/sdk.tar.zst -C /tmp/sdk --strip-components=1
+      - name: Prepare feeds (pinned upstream + golang)
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        working-directory: /tmp/sdk
+        run: |
+          # feeds update can return success after a prerequisite/indexing error.
+          make prepare-mk
+          ./scripts/feeds update base packages luci
+          for feed in base packages luci; do
+            test -s "feeds/$feed.index" || { echo "::error::SDK feed $feed has no package index."; exit 1; }
+          done
+          grep -qx 'Package: libnfnetlink' feeds/base.index || {
+            echo '::error::SDK base feed is missing target libnfnetlink.'
+            exit 1
+          }
+          ./scripts/feeds install -p packages golang
+      - name: Build nadkop packages
+        env:
+          # The cache key proves SDK, recipes and build policy still match.
+          NADKOP_CLEAN_PACKAGES: '1'
+          SDK_CACHE_HIT: ${{ steps.sdk-cache.outputs.cache-hit }}
+          COMBO: ${{ matrix.combo }}
+          NADKOP_SOURCE_ROOT: ${{ github.workspace }}
+        run: |
+          set -- /tmp/sdk "$GITHUB_WORKSPACE/dist/$COMBO"
+          if [ "$SDK_CACHE_HIT" = true ]; then
+            set -- "$@" --prepared
+          fi
+          bash "$GITHUB_WORKSPACE/.nadkop-build-tools/scripts/build-openwrt.sh" "$@"
+      # Tag-scoped caches cannot be read by the next tag. Save from main only;
+      # both main and release runs use exactly the same SDK, path and key.
+      - name: Save SDK and built dependencies
+        if: steps.sdk-cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v5
+        with:
+          path: /tmp/sdk
+          key: ${{ steps.key.outputs.key }}
+      - uses: actions/upload-artifact@v7
+        if: inputs.artifact_suffix != ''
+        with:
+          name: owrt-${{ matrix.combo }}-${{ inputs.artifact_suffix }}
+          path: dist/${{ matrix.combo }}/
+
