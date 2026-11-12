@@ -87,3 +87,6 @@ jobs:
 
       - name: Release workflow regression checks
         run: python3 scripts/test-release.py
+
+      - name: Init lifecycle lock regressions
+        run: python3 scripts/test-init-lock.py

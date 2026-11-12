@@ -11,7 +11,8 @@
   fails.
 - Require HTTPS for release downloads and attempt local package installation
   before refreshing package repositories, allowing installation without network
-  access when dependencies are already available.
+  access when dependencies are already available. Disable network access for
+  the first APK attempt so missing cached indexes cannot stall offline installs.
 
 ## 2026-11-12 — core 0.3.0-r6, LuCI 0.3.0-r13
 

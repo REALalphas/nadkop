@@ -7,6 +7,7 @@ for file in config.json nodes.json servers.json;do cp "/etc/nadkop/$file" "$work
 was_running=0
 /etc/init.d/nadkop running >/dev/null 2>&1 && was_running=1
 cleanup(){
+ exec 9>&-
  /etc/init.d/nadkop stop >/dev/null 2>&1 || true
  for file in config.json nodes.json servers.json;do cp "$work/$file" "/etc/nadkop/$file";done
  [ "$was_running" = 0 ] || /etc/init.d/nadkop start
@@ -38,6 +39,28 @@ initial="$(readlink /var/run/nadkop/current)"
 updater="$(jsonfilter -i "$work/status" -e '@.nadkop.instances.updater.pid')"
 [ -n "$updater" ]
 echo 'PASS: start launches Xray and updater for a scheduled configuration'
+# Hold the same lock used by saves/RPC while rc.common handles direct stops.
+# A stop_service failure alone is insufficient: rc.common would still kill procd.
+xray="$(jsonfilter -i "$work/status" -e '@.nadkop.instances.xray.pid')"
+exec 9>/var/run/nadkop/ui.lock
+flock -n 9
+for action in stop shutdown;do
+ if /usr/bin/timeout 5 /etc/init.d/nadkop "$action" > "$work/busy-$action" 2>&1;then
+  echo "FAIL: busy $action accepted";exit 1
+ else
+  result=$?
+  [ "$result" -ne 124 ] || { echo "FAIL: busy $action timed out";exit 1; }
+ fi
+ [ "$initial" = "$(readlink /var/run/nadkop/current)" ]
+ ubus call service list '{"name":"nadkop"}' > "$work/status"
+ [ "$xray" = "$(jsonfilter -i "$work/status" -e '@.nadkop.instances.xray.pid')" ]
+ [ "$updater" = "$(jsonfilter -i "$work/status" -e '@.nadkop.instances.updater.pid')" ]
+ kill -0 "$xray"
+ kill -0 "$updater"
+ echo "PASS: busy $action refuses promptly and preserves generation, Xray and updater"
+done
+flock -u 9
+exec 9>&-
 /usr/bin/timeout 20 /etc/init.d/nadkop reload
 wait_generation
 [ "$initial" != "$(readlink /var/run/nadkop/current)" ]

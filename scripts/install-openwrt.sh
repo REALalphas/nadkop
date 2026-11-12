@@ -30,7 +30,7 @@ if command -v apk >/dev/null 2>&1; then
 	done
 	# Try installation first so an offline router with all dependencies
 	# already present still succeeds; only reach for the network on failure.
-	if ! apk add --allow-untrusted "$@" 2>/dev/null; then
+	if ! apk add --no-network --allow-untrusted "$@" 2>/dev/null; then
 		apk update
 		# SDK development packages have no repository signature.
 		apk add --allow-untrusted "$@"
