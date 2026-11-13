@@ -109,16 +109,23 @@ func SyncServersContext(ctx context.Context, path string, nodes []Node, config C
 
 // SyncSourceServers updates one imported source without marking other sources missing.
 func SyncSourceServers(path, source string, nodes []Node, config Config) ([]ServerSummary, error) {
-	return syncSourceServers(path, source, nodes, config, false)
+	return syncSourceServers(path, source, nodes, config, false, true)
 }
 
 // SyncImportedSourceServers also cleans removed source records in the same
 // candidate publication. Import must not prune before validating future config.
 func SyncImportedSourceServers(path, source string, nodes []Node, config Config) ([]ServerSummary, error) {
-	return syncSourceServers(path, source, nodes, config, true)
+	return syncSourceServers(path, source, nodes, config, true, true)
 }
 
-func syncSourceServers(path, source string, nodes []Node, config Config, pruneRemoved bool) ([]ServerSummary, error) {
+// CheckImportedSourceServers validates the future catalogue without publishing
+// records. Callers hold the configuration lock through check and publication.
+func CheckImportedSourceServers(path, source string, nodes []Node, config Config) error {
+	_, err := syncSourceServers(path, source, nodes, config, true, false)
+	return err
+}
+
+func syncSourceServers(path, source string, nodes []Node, config Config, pruneRemoved, publish bool) ([]ServerSummary, error) {
 	if !namePattern.MatchString(source) {
 		return nil, errors.New("invalid source name")
 	}
@@ -127,7 +134,7 @@ func syncSourceServers(path, source string, nodes []Node, config Config, pruneRe
 			return nil, errors.New("node belongs to another source")
 		}
 	}
-	return syncServers(path, nodes, source, config, true, true, pruneRemoved)
+	return syncServers(path, nodes, source, config, true, publish, pruneRemoved)
 }
 
 // PruneServers removes unbound missing records without fetching subscriptions.

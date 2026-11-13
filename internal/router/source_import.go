@@ -15,6 +15,10 @@ import (
 // Insertion commits only the new source. Other unsaved editor changes stay in
 // the browser and can later be saved against the returned revision.
 func (b backend) addSource(ctx context.Context, r request) (any, error) {
+	return b.addSourceWith(ctx, r, atomicWrite)
+}
+
+func (b backend) addSourceWith(ctx context.Context, r request, write func(string, []byte) error) (any, error) {
 	unlock, err := b.lock()
 	if err != nil {
 		return nil, err
@@ -88,12 +92,18 @@ func (b backend) addSource(ctx context.Context, r request) (any, error) {
 	if _, err := core.ReadConfig(bytes.NewReader(append(encoded, '\n'))); err != nil {
 		return nil, errors.New("Imported source would make the saved configuration invalid")
 	}
-	servers, err = core.SyncImportedSourceServers(path, s.Name, nodes, c)
-	if err != nil {
+	if err := core.CheckImportedSourceServers(path, s.Name, nodes, c); err != nil {
 		return nil, err
 	}
-	if err := atomicWrite(b.config, encoded); err != nil {
+	// Publish the source before its catalogue records. If catalogue publication
+	// fails or the process exits, the configured source can be refreshed without
+	// leaving an orphan namespace that changes IDs on the next import.
+	if err := write(b.config, encoded); err != nil {
 		return nil, errors.New("Cannot save subscription")
+	}
+	servers, err = core.SyncImportedSourceServers(path, s.Name, nodes, c)
+	if err != nil {
+		return nil, errors.New("Subscription saved, but server catalogue update failed; reload and refresh subscriptions")
 	}
 	_, _, revision, err = b.read()
 	if err != nil {

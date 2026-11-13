@@ -28,15 +28,21 @@ if command -v apk >/dev/null 2>&1; then
 	for package in "$@"; do
 		case "$package" in *.apk) ;; *) echo 'This OpenWrt requires .apk packages.' >&2; exit 1 ;; esac
 	done
-	apk update
-	# SDK development packages have no repository signature.
-	apk add --allow-untrusted "$@"
+	# Try installation first so an offline router with all dependencies
+	# already present still succeeds; only reach for the network on failure.
+	if ! apk add --no-network --allow-untrusted "$@" 2>/dev/null; then
+		apk update
+		# SDK development packages have no repository signature.
+		apk add --allow-untrusted "$@"
+	fi
 elif command -v opkg >/dev/null 2>&1; then
 	for package in "$@"; do
 		case "$package" in *.ipk) ;; *) echo 'This OpenWrt requires .ipk packages.' >&2; exit 1 ;; esac
 	done
-	opkg update
-	opkg install "$@"
+	if ! opkg install "$@" 2>/dev/null; then
+		opkg update
+		opkg install "$@"
+	fi
 else
 	echo 'Neither apk nor opkg is available.' >&2
 	exit 1

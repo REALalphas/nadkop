@@ -47,6 +47,56 @@ class ReleaseWorkflowTest(unittest.TestCase):
                               cwd=self.work, env=dict(os.environ, **env),
                               capture_output=True, text=True, timeout=30)
 
+    def local_apk_install(self, missing_dependency=False):
+        etc = self.work / 'etc'
+        (etc / 'nadkop').mkdir(parents=True)
+        (etc / 'init.d').mkdir()
+        (etc / 'openwrt_release').touch()
+        for name in ('config.json', 'nodes.json'):
+            (etc / 'nadkop' / name).write_text('{}\n')
+        init = etc / 'init.d/nadkop'
+        init.write_text('#!/bin/sh\ncase "$1" in running|enabled) exit 1;; esac\n')
+        init.chmod(0o755)
+        bindir = self.work / 'bin'
+        bindir.mkdir()
+        calls = self.work / 'apk-calls'
+        tools = {
+            'id': '#!/bin/sh\necho 0\n',
+            'nadkop': '#!/bin/sh\nexit 0\n',
+            'apk': '#!/bin/sh\nprintf "%s\\n" "$*" >> "$APK_CALLS"\n'
+                   'case "$*" in *--no-network*) '
+                   '[ "$MISSING_DEPENDENCY" = 0 ] || exit 1;; esac\n',
+        }
+        for name, source in tools.items():
+            tool = bindir / name
+            tool.write_text(source)
+            tool.chmod(0o755)
+        installer = self.work / 'scripts/install-openwrt.sh'
+        installer.write_text(installer.read_text().replace('/etc/', str(etc) + '/'))
+        packages = [self.work / name for name in ('nfqws.apk', 'nadkop.apk')]
+        for package in packages:
+            package.touch()
+        result = subprocess.run(['sh', str(installer), *map(str, packages)],
+                                env=dict(os.environ, PATH=str(bindir) + ':' + os.environ['PATH'],
+                                         APK_CALLS=str(calls),
+                                         MISSING_DEPENDENCY=str(int(missing_dependency))),
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return calls.read_text().splitlines()
+
+    def test_local_apk_install_disables_network(self):
+        calls = self.local_apk_install()
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0].startswith('add --no-network --allow-untrusted '), calls)
+
+    def test_local_apk_missing_dependency_refreshes_then_retries(self):
+        calls = self.local_apk_install(missing_dependency=True)
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(calls[0].startswith('add --no-network --allow-untrusted '), calls)
+        self.assertEqual(calls[1], 'update')
+        self.assertTrue(calls[2].startswith('add --allow-untrusted '), calls)
+        self.assertNotIn('--no-network', calls[2])
+
     def derive(self, changelog, existing=False):
         self.execute('git init -q && git config user.name Test && '
                      'git config user.email test@example.invalid && '
@@ -152,7 +202,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         for name, source in {
                 pkgtype if pkgtype == 'apk' else 'opkg': '#!/bin/sh\nexit 0\n',
                 'id': '#!/bin/sh\necho 0\n',
-                'uclient-fetch': '#!/bin/sh\ncp "${3#fixture://}" "$2"\n'}.items():
+                'uclient-fetch': '#!/bin/sh\ncp "${3#https://fixture.invalid}" "$2"\n'}.items():
             path = bindir / name
             path.write_text(source)
             path.chmod(0o755)
@@ -163,7 +213,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         source = source.replace('/tmp/nadkop-dl.XXXXXX', str(self.work / 'downloads.XXXXXX'))
         path = self.work / 'getter.sh'
         path.write_text(source)
-        result = self.execute('sh getter.sh "fixture://$REMOTE" x86_64',
+        result = self.execute('sh getter.sh "https://fixture.invalid$REMOTE" x86_64',
                               REMOTE=str(remote), PATH=str(bindir) + os.pathsep + os.environ['PATH'])
         return result, marker
 

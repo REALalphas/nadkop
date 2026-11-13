@@ -12,6 +12,22 @@ if [ "${action:-}" = start ] && [ -z "$NADKOP_PREPARED" ]; then
  exec /usr/bin/nadkop apply
 fi
 
+# Lock before rc.common takes procd_lock, and retain it through procd_kill.
+# Returning failure from stop_service alone does not prevent rc.common from
+# killing the instances. RPC already holds this lock in its parent process.
+case "${action:-}" in
+	stop|shutdown)
+		if [ -z "${NADKOP_UI_LOCKED:-}" ]; then
+			(umask 077; mkdir -p /var/run/nadkop) || exit 1
+			exec 9>/var/run/nadkop/ui.lock || exit 1
+			if ! flock -n 9; then
+				logger -t nadkop 'Stop refused: another save or service operation is running'
+				exit 1
+			fi
+		fi
+		;;
+esac
+
 # Validate and prepare before replacing any running procd instance.
 restart() {
 	/usr/bin/nadkop apply

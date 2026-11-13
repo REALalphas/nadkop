@@ -76,3 +76,34 @@ func TestAddSourceCommitsOnlySourceAndRejectsBadImports(t *testing.T) {
 		t.Fatal("external source could not be saved", err)
 	}
 }
+
+func TestAddSourceFailedConfigWriteDoesNotReserveNamespace(t *testing.T) {
+	b := fixture(t)
+	path := filepath.Join(filepath.Dir(b.config), "provider.json")
+	if err := os.WriteFile(path, []byte(`{"title":"Provider","outbounds":[{"tag":"main","protocol":"trojan","settings":{"servers":[{"address":"example.test","port":443,"password":"secret"}]}}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	before, _, rev, err := b.read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := request{Content: path, Revision: rev}
+	_, err = b.addSourceWith(context.Background(), r, func(string, []byte) error {
+		return os.ErrPermission
+	})
+	if err == nil {
+		t.Fatal("failed write accepted")
+	}
+	after, _, afterRev, err := b.read()
+	if err != nil || !bytes.Equal(before, after) || rev != afterRev {
+		t.Fatal("failed import changed config", err)
+	}
+	catalog, err := core.ServerSummaries(filepath.Join(filepath.Dir(b.config), "servers.json"))
+	if err != nil || len(catalog) != 0 {
+		t.Fatal("failed import reserved catalogue records", catalog, err)
+	}
+	result, err := b.addSource(context.Background(), r)
+	if err != nil || result.(map[string]any)["source"].(core.Source).Name != "Provider" {
+		t.Fatal("retry changed namespace", result, err)
+	}
+}

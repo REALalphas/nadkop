@@ -25,6 +25,11 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
+# Use a self-contained fixture; saved VM references may need their original catalogue.
+/etc/init.d/nadkop stop
+printf '%s\n' '{"sources":[],"rules":[],"default":"direct","socksPort":1080}' > /etc/nadkop/config.json
+printf '[]\n' > /etc/nadkop/nodes.json
+rm -f /etc/nadkop/servers.json
 ok() {
 	if [ -n "$(jsonfilter -i "$1" -e '@.error')" ]; then
 		echo 'FAIL: RPC returned an error' >&2
@@ -127,12 +132,17 @@ ok "$work/named-get"
 ubus call nadkop check > "$work/check"
 ok "$work/check"
 [ "$(jsonfilter -i "$work/check" -e '@.ok')" = true ]
-[ "$(jsonfilter -i "$work/check" -e '@.steps[*].id' | wc -l)" -eq 6 ]
+[ "$(jsonfilter -i "$work/check" -e '@.steps[*].id' | wc -l)" -eq 7 ]
 [ "$(jsonfilter -i "$work/check" -e '@.steps[0].state')" = ok ]
 [ "$(jsonfilter -i "$work/check" -e '@.steps[3].state')" = ok ]
 [ "$(jsonfilter -i "$work/check" -e '@.steps[4].state')" = skipped ]
 [ "$(jsonfilter -i "$work/check" -e '@.steps[5].state')" = skipped ]
-echo 'PASS: rule name save/reload; six diagnostic stages with direct-only Zapret skips'
+[ "$(jsonfilter -i "$work/check" -e '@.steps[6].id')" = coexistence ]
+case "$(jsonfilter -i "$work/check" -e '@.steps[6].state')" in
+ ok|warning) ;;
+ *) echo 'FAIL: unexpected coexistence diagnostic state' >&2; exit 1 ;;
+esac
+echo 'PASS: rule name save/reload; seven diagnostic stages with direct-only Zapret skips'
 echo 'PASS: import, save empty local source, revision conflict, unbound catalogue cleanup, nodes, Xray preflight'
 
 ubus call nadkop service '{"action":"restart"}' > "$work/restart"
