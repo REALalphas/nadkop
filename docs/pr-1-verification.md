@@ -83,8 +83,10 @@ PR #2's Go 1.23 job exposed an existing scheduling assumption in
 `TestX2MonitorReadyGroupsAndSingleApply`: both fast groups could be applied
 before the slow probe was scheduled, so its atomic probe count was still 1.
 The test now waits for the slow probe's explicit start signal before checking
-that count. It still requires both fast groups to apply while the slow probe
-is blocked, checks deduplication, and waits for the final slow result.
+that count. Before releasing the slow probe, it requires both fast groups to
+have applied and the slow probe to have started. The fast groups may apply
+before the slow worker is scheduled. Deduplication and the final slow result
+remain checked.
 
 With Go 1.23.12, the original test reproduced `fast shared 1` in a temporary
 copy using `-count=10000 -cpu=2,4,8`. The corrected test passed
