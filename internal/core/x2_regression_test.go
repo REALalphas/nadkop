@@ -33,6 +33,7 @@ func TestX2MonitorReadyGroupsAndSingleApply(t *testing.T) {
 		{Tag: "shared", URL: "fast", Mode: "url", Members: []HealthMember{{"f", "f"}}},
 	}}
 	release := make(chan struct{})
+	slowStarted := make(chan struct{})
 	defer close(release)
 	applies := make(chan string, 3)
 	done := make(chan error, 1)
@@ -41,6 +42,7 @@ func TestX2MonitorReadyGroupsAndSingleApply(t *testing.T) {
 		done <- MonitorCycle(context.Background(), manifest, func(_ context.Context, _ HealthManifest, _ HealthMember, url string) ProbeResult {
 			count.Add(1)
 			if url == "slow" {
+				close(slowStarted)
 				<-release
 			}
 			return ProbeResult{Available: true}
@@ -48,6 +50,8 @@ func TestX2MonitorReadyGroupsAndSingleApply(t *testing.T) {
 	}()
 	first := x2Receive(t, applies)
 	second := x2Receive(t, applies)
+	// Fast results can be applied before the slow worker is scheduled.
+	x2Receive(t, slowStarted)
 	if first != "fast" || second != "shared" || count.Load() != 2 {
 		t.Fatal(first, second, count.Load())
 	}

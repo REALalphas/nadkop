@@ -77,6 +77,21 @@ Zapret reboot check above. Both guests were powered off afterward.
     scripts/build-openwrt.sh "$SDK" "$OUTPUT" --prepared
   ```
 
+## CI follow-up: monitor regression scheduling
+
+PR #2's Go 1.23 job exposed an existing scheduling assumption in
+`TestX2MonitorReadyGroupsAndSingleApply`: both fast groups could be applied
+before the slow probe was scheduled, so its atomic probe count was still 1.
+The test now waits for the slow probe's explicit start signal before checking
+that count. It still requires both fast groups to apply while the slow probe
+is blocked, checks deduplication, and waits for the final slow result.
+
+With Go 1.23.12, the original test reproduced `fast shared 1` in a temporary
+copy using `-count=10000 -cpu=2,4,8`. The corrected test passed
+`-count=10000 -cpu=1,2,4,8` (40,000 runs), plus
+`-race -count=1000 -cpu=1,4` (2,000 runs). Full `go test ./...` and `go vet ./...` also passed with
+Go 1.23.12. Production monitor code is unchanged.
+
 ## Evidence and limits
 
 Sanitized command logs, package checksums and build metadata are in the local,
