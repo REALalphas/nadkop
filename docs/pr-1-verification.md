@@ -11,7 +11,7 @@ installer and VM-test fixes recorded with this report. No release version bump.
   LuCI 0.3.0-r13, nfqws 2026.11.01-r1).
 - `python3 scripts/test-release.py`: 32 passed, including local APK installation
   without network access and refresh/retry when a dependency is unavailable.
-- `python3 scripts/test-init-lock.py`: 3 passed; now also required by CI.
+- `python3 scripts/test-init-lock.py`: 3 passed; already required by CI before this follow-up.
 - ShellCheck warning profile, JavaScript/MJS syntax, Python compilation,
   Actionlint for CI, and `git diff --check`: passed.
 
@@ -46,10 +46,17 @@ its enabled autostart state, and its initially stopped service state.
 The 24.10.8 stopped/disabled installation also preserved its saved private files
 and disabled/stopped state.
 
-The 24.10.8 guest also passed two reboot checks: a direct configuration
-started Xray and the updater automatically with private file checksums intact;
-a Zapret configuration started Xray, nfqws and the updater and reattached
-NFQUEUE 200 / the nadkop nftables table. Both guests were powered off afterward.
+The 24.10.8 guest passed the final Zapret reboot check: Xray, nfqws and the
+updater started automatically, private file checksums matched, and NFQUEUE 200 /
+the nadkop nftables table reattached (`reboot24-after.log`, command exit 0).
+
+An earlier combined direct-reboot / next-scenario command printed
+`PASS-direct-autostart-reboot-and-private-state`, then exited 1 while preparing
+Zapret: that candidate lacked required `zapretArgs` and was rejected as
+`Invalid saved configuration` (`reboot24-direct.log`). This combined command is
+not counted as a clean verification pass. After supplying `zapretArgs`,
+validation succeeded (`reboot24-queue-before.log`), followed by the successful
+Zapret reboot check above. Both guests were powered off afterward.
 
 ## Findings corrected during verification
 
@@ -69,6 +76,23 @@ NFQUEUE 200 / the nadkop nftables table. Both guests were powered off afterward.
   MAKEFLAGS="TAR=$SDK/staging_dir/host/bin/tar" NADKOP_CLEAN_PACKAGES=1 \
     scripts/build-openwrt.sh "$SDK" "$OUTPUT" --prepared
   ```
+
+## CI follow-up: monitor regression scheduling
+
+PR #2's Go 1.23 job exposed an existing scheduling assumption in
+`TestX2MonitorReadyGroupsAndSingleApply`: both fast groups could be applied
+before the slow probe was scheduled, so its atomic probe count was still 1.
+The test now waits for the slow probe's explicit start signal before checking
+that count. Before releasing the slow probe, it requires both fast groups to
+have applied and the slow probe to have started. The fast groups may apply
+before the slow worker is scheduled. Deduplication and the final slow result
+remain checked.
+
+With Go 1.23.12, the original test reproduced `fast shared 1` in a temporary
+copy using `-count=10000 -cpu=2,4,8`. The corrected test passed
+`-count=10000 -cpu=1,2,4,8` (40,000 runs), plus
+`-race -count=1000 -cpu=1,4` (2,000 runs). Full `go test ./...` and `go vet ./...` also passed with
+Go 1.23.12. Production monitor code is unchanged.
 
 ## Evidence and limits
 
