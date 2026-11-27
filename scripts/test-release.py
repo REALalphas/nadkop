@@ -345,17 +345,19 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertEqual(key('sdk', 'ubuntu24', root=self.work, policy_root=ROOT), before)
 
     def test_sdk_prepared_build_requires_exact_cache_hit(self):
-        builder = self.work / '.nadkop-build-tools/scripts/build-openwrt.sh'
-        builder.parent.mkdir(parents=True)
-        builder.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$GITHUB_WORKSPACE/build-args"\n')
-        for hit in ('true', 'false', ''):
-            result = self.execute(run_block('openwrt.yml', 'Build nadkop packages'),
-                                  GITHUB_WORKSPACE=str(self.work), COMBO='apk-x86_64',
-                                  SDK_CACHE_HIT=hit)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            args = (self.work / 'build-args').read_text().splitlines()
-            self.assertEqual(args[:2], ['/tmp/sdk', str(self.work / 'dist/apk-x86_64')])
-            self.assertEqual(args[2:], ['--prepared'] if hit == 'true' else [])
+        for tools_root in ('.', '.nadkop-build-tools'):
+            builder = self.work / tools_root / 'scripts/build-openwrt.sh'
+            builder.parent.mkdir(parents=True, exist_ok=True)
+            builder.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$GITHUB_WORKSPACE/build-args"\n')
+            for hit in ('true', 'false', ''):
+                with self.subTest(tools_root=tools_root, hit=hit):
+                    result = self.execute(run_block('openwrt.yml', 'Build nadkop packages'),
+                                          GITHUB_WORKSPACE=str(self.work), COMBO='apk-x86_64',
+                                          BUILD_TOOLS_ROOT=tools_root, SDK_CACHE_HIT=hit)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    args = (self.work / 'build-args').read_text().splitlines()
+                    self.assertEqual(args[:2], ['/tmp/sdk', str(self.work / 'dist/apk-x86_64')])
+                    self.assertEqual(args[2:], ['--prepared'] if hit == 'true' else [])
 
     def publish_candidate(self, moved=False, annotated=True):
         result = self.execute('git init -q && git config user.name Test && '

@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [master, main]
+    paths-ignore:
+      - '**/*.md'
   pull_request:
     branches: [master, main]
+    paths-ignore:
+      - '**/*.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +19,7 @@ jobs:
     name: Go ${{ matrix.go }} — vet, fmt, build, test
     runs-on: ubuntu-24.04
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         go: ['1.23', '1.24']
     steps:
@@ -24,13 +28,14 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go }}
-          # No external Go dependencies, so there is no go.sum to hash.
-          cache: false
+          cache-dependency-path: go.mod
 
       - name: go vet
+        if: matrix.go == '1.23'
         run: go vet ./...
 
       - name: gofmt (only real sources, build/ is gitignored)
+        if: matrix.go == '1.23'
         run: |
           out=$(gofmt -l cmd internal)
           if [ -n "$out" ]; then
@@ -40,16 +45,19 @@ jobs:
           fi
 
       - name: go build
+        if: matrix.go == '1.23'
         run: go build -o build/nadkop ./cmd/nadkop
 
       - name: validate example config
+        if: matrix.go == '1.23'
         run: ./build/nadkop validate -config examples/config.json
 
       - name: Version consistency (bump-version.sh --check)
+        if: matrix.go == '1.23'
         run: bash scripts/bump-version.sh --check
 
       - name: go test
-        run: go test ./...
+        run: go test -count=1 ./...
 
   lint:
     name: shellcheck + node --check + py_compile
@@ -59,7 +67,10 @@ jobs:
 
       - name: shellcheck
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          if ! command -v shellcheck >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq shellcheck
+          fi
           targets=$(git ls-files '*.sh' ':!:build/*')
           for f in openwrt/nadkop/files/nadkop.init openwrt/nadkop/files/usr/libexec/rpcd/nadkop; do
             [ -f "$f" ] && targets="$targets $f"
