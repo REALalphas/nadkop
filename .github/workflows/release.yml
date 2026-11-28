@@ -57,8 +57,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: '1.23'
-          # No external Go dependencies, so there is no go.sum to hash.
-          cache: false
+          cache-dependency-path: go.mod
       - name: Verify release candidate
         env:
           VER: ${{ steps.v.outputs.ver }}
@@ -68,7 +67,7 @@ jobs:
           test "$VER" = "$ui" || { echo '::error::Release tag must match the LuCI package version.'; exit 1; }
           bash scripts/bump-version.sh --check
           go vet ./...
-          go test ./...
+          go test -count=1 ./...
           go build -o build/nadkop ./cmd/nadkop
           ./build/nadkop validate -config examples/config.json
           test -z "$(gofmt -l cmd internal)"
@@ -96,9 +95,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: '1.23'
-          # No external Go dependencies, so there is no go.sum to hash.
-          cache: false
-      - run: bash scripts/bump-version.sh --check
+          cache-dependency-path: go.mod
       - run: |
           mkdir -p dist/host
           GOOS=linux GOARCH=amd64 go build -o dist/host/nadkop-linux-x86_64 ./cmd/nadkop
